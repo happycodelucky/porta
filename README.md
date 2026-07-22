@@ -29,8 +29,9 @@ flag for exactly this — the recipes below use it.
 
 ## Install
 
-> **Not released yet.** Building from source works today; the other channels
-> below go live with the first tagged release.
+> Port Authority is at **0.9** — feature complete and stabilizing ahead of 1.0.
+> The channels below activate with the first tagged release; until then, build
+> from source.
 
 ### Homebrew
 
@@ -63,7 +64,7 @@ do the same thing.
 Every release ships `.deb` packages for amd64 and arm64:
 
 ```bash
-sudo apt install ./porta_0.1.0_amd64.deb
+sudo apt install ./porta_0.9.0_amd64.deb
 ```
 
 There's no APT repository to add — download the `.deb` from the
@@ -456,6 +457,16 @@ The task graph also has `format`, `lint-stable` (Clippy on moving stable),
 `PORTA_HOME` and include multi-process registry and configuration concurrency
 coverage. [`mise.lock`](mise.lock) pins resolved tools for the supported
 platforms.
+
+## A small ask
+
+Right now porta installs from a personal tap. Getting it into Homebrew's own
+formula list — so `brew install porta` just works, with no tap to add — depends
+on showing the maintainers that people actually use it.
+
+So if porta saved you from one more `EADDRINUSE`, a
+[star](https://github.com/happycodelucky/porta) genuinely helps it get there.
+Bug reports and "here's how I use it" issues help even more.
 
 ## Design and prior work
 

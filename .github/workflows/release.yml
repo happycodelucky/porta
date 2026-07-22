@@ -1,6 +1,6 @@
 name: Release
 
-# Tagging v0.1.0 builds every supported binary, publishes a checksummed GitHub
+# Tagging v0.9.0 builds every supported binary, publishes a checksummed GitHub
 # release, and updates the Homebrew tap formula.
 on:
   push:

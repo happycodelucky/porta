@@ -1,6 +1,6 @@
 # Port Authority (`porta`) Specification
 
-- Status: Implemented baseline (`0.1.0`)
+- Status: Release candidate (`0.9.0`)
 - Implementation: Rust 1.93
 - Product name: Port Authority
 - Executable name: `porta`
@@ -937,8 +937,8 @@ lock acquisition at five seconds. Release verification records the stripped
 binary size. Correctness takes priority over artifact size if the backend is
 reconsidered.
 
-The locally built stripped `aarch64-apple-darwin` release binary for `0.1.0` is
-1,351,024 bytes. CI is responsible for recording and validating the other
+The locally built stripped `aarch64-apple-darwin` release binary for `0.9.0` is
+1,935,216 bytes. CI is responsible for recording and validating the other
 supported artifacts.
 
 ### 8.5 Existing prototype migration
@@ -1394,7 +1394,7 @@ itself the upstream. It installs `/usr/bin/porta` plus the README and license
 under `/usr/share/doc/porta/`.
 
 ```console
-$ sudo apt install ./porta_0.1.0_amd64.deb
+$ sudo apt install ./porta_0.9.0_amd64.deb
 ```
 
 Dependencies resolve through `dpkg-shlibdeps`, which `cargo-deb` only warns

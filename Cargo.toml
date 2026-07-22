@@ -1,6 +1,6 @@
 [package]
 name = "port-authority"
-version = "0.1.0"
+version = "0.9.0"
 edition = "2024"
 rust-version = "1.93"
 description = "Reserve and lease local TCP ports so parallel worktrees, agents, and dev servers stop colliding"

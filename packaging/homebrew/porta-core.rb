@@ -12,7 +12,7 @@
 # Before submitting, fill in the source tarball checksum:
 #
 #   curl -fsSLo porta.tar.gz \
-#     https://github.com/happycodelucky/porta/archive/refs/tags/v0.1.0.tar.gz
+#     https://github.com/happycodelucky/porta/archive/refs/tags/v0.9.0.tar.gz
 #   shasum -a 256 porta.tar.gz
 #
 # Then validate locally, from a homebrew-core checkout:
@@ -24,7 +24,7 @@
 class Porta < Formula
   desc "Reserve and lease local TCP ports for parallel worktrees and dev servers"
   homepage "https://github.com/happycodelucky/porta"
-  url "https://github.com/happycodelucky/porta/archive/refs/tags/v0.1.0.tar.gz"
+  url "https://github.com/happycodelucky/porta/archive/refs/tags/v0.9.0.tar.gz"
   sha256 "@SHA256_SOURCE@"
   license "MIT"
   head "https://github.com/happycodelucky/porta.git", branch: "main"

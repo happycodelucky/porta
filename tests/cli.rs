@@ -108,7 +108,7 @@ fn help_and_version_expose_the_contract() {
         previous = position;
     }
     let version = run(porta(temporary.path()).arg("--version"));
-    assert!(String::from_utf8_lossy(&version.stdout).starts_with("porta 0.1.0"));
+    assert!(String::from_utf8_lossy(&version.stdout).starts_with("porta 0.9.0"));
 
     let lease_help = run(porta(temporary.path()).args(["lease", "--help"]));
     let lease_help = String::from_utf8(lease_help.stdout).expect("UTF-8 lease help");
