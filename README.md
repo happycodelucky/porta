@@ -10,7 +10,7 @@ Reserve and lease local TCP ports so parallel worktrees, agents, and dev
 servers stop colliding. The binary is `porta` — one small daemonless Rust
 executable.
 
-## Why
+## Overview
 
 Running one application locally is easy. Running several copies is not: every
 frontend, API, database, worker, and debugger wants a port, usually from the
@@ -22,10 +22,42 @@ asks for the ports it needs and gets numbers nobody else has claimed. State
 lives in one per-user registry file, concurrent runs coordinate through an OS
 file lock, and nothing runs in the background.
 
-One honest caveat up front: reservations are advisory. `porta` hands out
-numbers and remembers them, but it can't stop an uncooperative process from
-binding a port after the command exits. Most dev servers have a strict-port
-flag for exactly this — the recipes below use it.
+Reservations are advisory. `porta` hands out numbers and remembers them, but it
+can't stop an uncooperative process from binding a port after the command
+exits. Most dev servers have a strict-port flag for that; the recipes below use
+it.
+
+## Alternatives to porta
+
+Port allocation isn't a new problem, and porta isn't always the right shape for
+it. If one of these fits your situation better, use it:
+
+- **[python_portpicker](https://github.com/google/python_portpicker)** — grabs an
+  unused port for a test, with an optional daemon that reclaims ports when the
+  owning process exits. Good when process lifetime is the right ownership
+  boundary. Archived in April 2026.
+- **[get-port](https://github.com/sindresorhus/get-port)** — a small Node.js
+  library for "give me a free port right now," with preferred ports and ranges.
+  Reach for it when application code needs a port inline rather than from a CLI.
+- **[PortKeeper](https://github.com/dynapsys/portkeeper)** — a Python registry
+  with file locking that can also hold sockets open, write `.env` files, and
+  launch your command with the allocated values. Worth it if you want the
+  allocator to wire up configuration too.
+- **[port-registry](https://github.com/n3r/port-registry)** — a Go daemon with a
+  REST API and SQLite, worktree-aware and built for agent workflows. Good when
+  you want a continuously available local service and more than one kind of
+  client.
+
+Sometimes you need no tool at all. If your application can accept an
+already-bound socket, binding port `0` and letting the OS pick is safer than
+reserving a number and binding later. And `lsof -i`, `ss -ltnp`, or `netstat`
+show what's listening right now — they just can't see a reservation for a
+worktree that isn't currently running.
+
+porta stays narrow: no daemon, ports that stay assigned to a directory while
+nothing is running, and cleanup that follows the worktree's lifecycle. The
+fuller comparison, including where these tools do better, is in
+[docs/related-work.md](docs/related-work.md).
 
 ## Install
 
@@ -50,7 +82,7 @@ needed:
 mise use -g github:happycodelucky/porta
 ```
 
-Or build it from the crate, if you'd rather:
+Or build it from the crate:
 
 ```bash
 mise use -g cargo:port-authority@latest
@@ -192,7 +224,7 @@ the current directory.
 
 ### See what's going on
 
-Three read commands, three sources:
+Three read commands:
 
 ```console
 $ porta list           # what porta is tracking
@@ -256,7 +288,8 @@ reclaimed after a grace period (a week by default). If the worktree comes
 back, the mark clears itself. Cleanup also runs automatically once you
 accumulate enough reservations.
 
-Impatient? `--force` reaps every currently-missing directory in one pass:
+`--force` skips the wait and reaps every currently-missing directory in one
+pass:
 
 ```bash
 porta clean --force
@@ -458,6 +491,9 @@ The task graph also has `format`, `lint-stable` (Clippy on moving stable),
 coverage. [`mise.lock`](mise.lock) pins resolved tools for the supported
 platforms.
 
+The full CLI, JSON, registry, and packaging contract lives in
+[SPEC.md](SPEC.md), not in this README.
+
 ## A small ask
 
 Right now porta installs from a personal tap. Getting it into Homebrew's own
@@ -465,19 +501,11 @@ formula list — so `brew install porta` just works, with no tap to add — depe
 on showing the maintainers that people actually use it.
 
 So if porta saved you from one more `EADDRINUSE`, a
-[star](https://github.com/happycodelucky/porta) genuinely helps it get there.
-Bug reports and "here's how I use it" issues help even more.
-
-## Design and prior work
-
-- [Product and technical specification](SPEC.md) — the full CLI, JSON, and
-  registry contract lives here, not in this README
-- [Python prototype record](docs/python-prototype.md)
-- [Related work and design influences](docs/related-work.md)
-
-Port Authority is an independent open-source project and is not connected to
-Akkio.
+[star](https://github.com/happycodelucky/porta) helps it get there. Bug reports
+and "here's how I use it" issues help more.
 
 ## License
 
 Released under the [MIT License](LICENSE).
+
+Port Authority is an independent open-source project, not connected to Akkio.
