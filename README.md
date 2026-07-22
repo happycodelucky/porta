@@ -29,13 +29,9 @@ it.
 
 ## Alternatives to porta
 
-Port allocation isn't a new problem, and porta isn't always the right shape for
-it. If one of these fits your situation better, use it:
+Port allocation isn't a new problem, and porta might not be the right fit for
+you. If one of these suits your situation better, use it:
 
-- **[python_portpicker](https://github.com/google/python_portpicker)** — grabs an
-  unused port for a test, with an optional daemon that reclaims ports when the
-  owning process exits. Good when process lifetime is the right ownership
-  boundary. Archived in April 2026.
 - **[get-port](https://github.com/sindresorhus/get-port)** — a small Node.js
   library for "give me a free port right now," with preferred ports and ranges.
   Reach for it when application code needs a port inline rather than from a CLI.
