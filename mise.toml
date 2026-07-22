@@ -7,14 +7,16 @@ shellcheck = "latest"
 "cargo:cargo-deb" = "latest"
 
 [tasks.toolchain]
-description = "Materialize the pinned Rust toolchain and its components"
-# `check` runs fmt, lint, and test in parallel. Where the pinned toolchain is not
-# installed yet, each of those makes rustup fetch it, and the concurrent installs
-# race on a shared download directory: one renames the partial file and the
-# others fail with "could not rename 'downloaded' file". Depending on this task
-# first makes rustup do the work once, serially. Each command below pulls a
-# different component, so none is left to be fetched under parallelism.
-run = ["rustc --version", "cargo fmt --version", "cargo clippy --version"]
+description = "Materialize the pinned Rust toolchain with rustfmt and clippy"
+# `check` runs fmt, lint, and test in parallel. mise installs the pinned toolchain
+# through rustup with a minimal profile that omits rustfmt and clippy, and
+# `cargo fmt`/`cargo clippy` error rather than installing them on demand. When the
+# base toolchain is not present yet, the parallel cargo invocations also race to
+# install it and collide in rustup's shared download directory. This task runs
+# first, serially, installing the toolchain and both components in one idempotent
+# step so everything is present before anything runs in parallel. RUSTUP_TOOLCHAIN
+# is set to the pinned version by mise.
+run = "rustup toolchain install \"$RUSTUP_TOOLCHAIN\" --component rustfmt --component clippy --no-self-update --profile minimal"
 
 [tasks.fmt]
 description = "Check Rust formatting"
