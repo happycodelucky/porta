@@ -1,5 +1,10 @@
 # Port Authority
 
+![Rust 1.93+](https://img.shields.io/badge/Rust-1.93%2B-CE422B.svg?style=for-the-badge&logo=rust&logoColor=white)
+![macOS](https://img.shields.io/badge/macOS-ARM64%20%7C%20x86--64-blue.svg?style=for-the-badge&logo=apple)
+![Linux](https://img.shields.io/badge/Linux-ARM64%20%7C%20x86--64-FCC624.svg?style=for-the-badge&logo=linux&logoColor=black)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)
+
 Reserve and lease local TCP ports so parallel worktrees, agents, and dev
 servers stop colliding. The binary is `porta` — one small daemonless Rust
 executable.
@@ -23,33 +28,62 @@ flag for exactly this — the recipes below use it.
 
 ## Install
 
-With the repository's pinned mise toolchain:
+> **Not released yet.** Building from source works today; the other channels
+> below go live with the first tagged release.
 
-```console
-$ mise install
-$ mise run install
-$ porta --version
+### Homebrew
+
+```bash
+brew install happycodelucky/tap/porta
 ```
 
-`mise run install` builds with Cargo and installs `porta` into Cargo's binary
-directory, normally `~/.cargo/bin` (`CARGO_INSTALL_ROOT` is respected). Prefer
-plain Cargo? From a checkout:
+### mise
 
-```console
-$ cargo install --path . --locked
+```bash
+mise use -g cargo:port-authority@latest
 ```
 
-The crates.io package is named `port-authority` because `porta` was already
-taken — the binary is still `porta`. Once published, these will work too:
+Once the shorthand lands in the mise registry, `mise use -g porta@latest` will
+do the same thing without the Cargo backend.
 
-```console
-$ cargo install port-authority --locked
-$ mise use -g cargo:port-authority@latest
+### Cargo
+
+```bash
+cargo install port-authority --locked
 ```
 
-Homebrew and prebuilt GitHub binaries are planned but not published yet; the
-formula template is at
-[`packaging/homebrew/porta.rb.in`](packaging/homebrew/porta.rb.in).
+The crates.io package is `port-authority` because `porta` was already taken by
+an unrelated project. The binary it installs is still `porta`.
+
+### Prebuilt binaries
+
+Checksummed archives for macOS and Linux (ARM64 and x86-64) are attached to
+each [release](https://github.com/happycodelucky/porta/releases). Download,
+verify, and drop `porta` somewhere on your `PATH` — no Rust toolchain needed.
+
+### From source
+
+```bash
+git clone https://github.com/happycodelucky/porta.git
+```
+
+```bash
+mise install && mise run install
+```
+
+`mise install` fetches the pinned toolchain; `mise run install` runs the full
+check gate and installs `porta` into Cargo's binary directory, normally
+`~/.cargo/bin` (`CARGO_INSTALL_ROOT` is respected). Without mise:
+
+```bash
+cargo install --path . --locked
+```
+
+Then confirm it landed:
+
+```bash
+porta --version
+```
 
 ## Commands
 
@@ -352,10 +386,10 @@ keys you've set, and everything else keeps its default.
 
 Everything runs through mise:
 
-```console
-$ mise install
-$ mise run check     # fmt + clippy + tests + shellcheck
-$ mise run smoke     # end-to-end CLI test against isolated state
+```bash
+mise install
+mise run check     # fmt + clippy + tests + shellcheck
+mise run smoke     # end-to-end CLI test against isolated state
 ```
 
 The task graph also has `format`, `lint-stable` (Clippy on moving stable),
@@ -376,4 +410,4 @@ Akkio.
 
 ## License
 
-Port Authority is licensed under the [MIT License](LICENSE).
+Released under the [MIT License](LICENSE).

@@ -1,0 +1,41 @@
+# Rust / Cargo
+# Cargo.lock is committed on purpose: porta ships as a binary, so pinned
+# dependency versions keep release builds reproducible.
+/target/
+**/*.rs.bk
+*.pdb
+
+# mise
+# mise.toml and mise.lock are committed; only local overrides are ignored.
+mise.local.toml
+.mise.local.toml
+.mise/
+
+# AI assistant local state
+# Shared config that belongs to the repo (CLAUDE.md, .cursor/rules) should be
+# committed deliberately rather than ignored here.
+.claude/
+CLAUDE.local.md
+.aider*
+.continue/
+.specstory/
+.windsurf/
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*~
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Local environment
+.env
+.env.local
+*.log
+
+# Python prototype leftovers (see docs/python-prototype.md)
+__pycache__/
+*.pyc

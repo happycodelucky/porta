@@ -1,0 +1,58 @@
+min_version = "2025.7.12"
+
+[tools]
+rust = "1.93.1"
+shellcheck = "latest"
+"cargo:cargo-audit" = "latest"
+
+[tasks.fmt]
+description = "Check Rust formatting"
+run = "cargo fmt --all --check"
+
+[tasks.format]
+description = "Format Rust sources"
+run = "cargo fmt --all"
+
+[tasks.lint]
+description = "Run Clippy with warnings denied"
+run = "cargo clippy --all-targets --all-features -- -D warnings"
+
+[tasks.lint-stable]
+description = "Run Clippy on the current stable Rust toolchain"
+run = "mise exec rust@stable -- cargo clippy --all-targets --all-features -- -D warnings"
+
+[tasks.test]
+description = "Run the Rust test suite"
+run = "cargo test --all-features"
+
+[tasks.shellcheck]
+description = "Lint shell automation"
+run = "shellcheck scripts/*.sh"
+
+[tasks.check]
+description = "Run formatting, lint, tests, and shell automation checks"
+depends = ["fmt", "lint", "test", "shellcheck"]
+
+[tasks.build]
+description = "Build a validated release binary"
+depends = ["check"]
+run = "cargo build --release --locked"
+
+[tasks.install]
+description = "Install porta through Cargo"
+depends = ["check"]
+run = "cargo install --path . --locked --force"
+
+[tasks.smoke]
+description = "Run the isolated end-to-end CLI smoke test"
+depends = ["build"]
+run = "bash scripts/smoke.sh"
+
+[tasks.audit]
+description = "Audit Rust dependencies for known vulnerabilities"
+run = "cargo audit"
+
+[tasks.package]
+description = "Validate the crate package contents"
+depends = ["check"]
+run = "cargo package --locked --allow-dirty"

@@ -1,0 +1,36 @@
+class Porta < Formula
+  desc "Reserve and lease local TCP ports for parallel worktrees and dev servers"
+  homepage "https://github.com/@GITHUB_OWNER@/porta"
+  version "@VERSION@"
+  license "MIT"
+
+  on_macos do
+    if Hardware::CPU.arm?
+      url "https://github.com/@GITHUB_OWNER@/porta/releases/download/v@VERSION@/porta-v@VERSION@-aarch64-apple-darwin.tar.gz"
+      sha256 "@SHA256_MACOS_ARM64@"
+    else
+      url "https://github.com/@GITHUB_OWNER@/porta/releases/download/v@VERSION@/porta-v@VERSION@-x86_64-apple-darwin.tar.gz"
+      sha256 "@SHA256_MACOS_X86_64@"
+    end
+  end
+
+  on_linux do
+    if Hardware::CPU.arm?
+      url "https://github.com/@GITHUB_OWNER@/porta/releases/download/v@VERSION@/porta-v@VERSION@-aarch64-unknown-linux-gnu.tar.gz"
+      sha256 "@SHA256_LINUX_ARM64@"
+    else
+      url "https://github.com/@GITHUB_OWNER@/porta/releases/download/v@VERSION@/porta-v@VERSION@-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "@SHA256_LINUX_X86_64@"
+    end
+  end
+
+  def install
+    bin.install "porta"
+  end
+
+  test do
+    ENV["PORTA_HOME"] = testpath/"state"
+    assert_match version.to_s, shell_output("#{bin}/porta --version")
+    assert_match(/\A\d+\n\z/, shell_output("#{bin}/porta lease --timeout 1m"))
+  end
+end
