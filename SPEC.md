@@ -92,6 +92,7 @@ config        list, read, or update configuration
 | `-c` | `--contiguous` | Require a contiguous multi-port allocation |
 | `-e` | `--expires` | Reservation expiration duration or timestamp |
 | `-o` | `--order` | Listener output column ordering |
+| — | `--force` | Reap missing directories without their grace period |
 | `-j` | `--json` | Emit machine-readable JSON |
 | `-V` | `--version` | Print the version |
 | `-h` | `--help` | Print contextual help |
@@ -355,6 +356,14 @@ leases
 Directories are ordered by path with allocations by port, followed by leases
 ordered by port. Live socket state is refreshed for listed ports.
 
+`list` stats every reservation directory to report its status, and persists
+what it observed: an absent directory that is not yet marked records
+`missing_since`, and a directory that has returned has its mark cleared. This
+starts the grace period at the moment the loss first becomes visible rather
+than waiting for the next `clean`. `list` never reaps, so listing cannot
+remove a reservation. When any directory is missing, plain output ends with a
+line reporting the count and pointing at `porta clean`.
+
 Human-readable expirations are converted to the system's local timezone and
 formatted using its locale's date and time conventions, followed by an
 explicit numeric UTC offset. Because this presentation varies by machine,
@@ -369,16 +378,23 @@ Observe missing directories, restore returned directories, and reap reservations
 whose missing grace period has elapsed.
 
 ```text
-porta clean [-j]
+porta clean [--force] [-j]
 ```
 
-Plain output:
+Plain output is borderless aligned label and count columns, leading with the
+number of reaped reservations so the destructive result is the first thing
+read:
 
 ```text
-Released leases: L; expired reservations: E; marked missing: M; restored: R; reaped: D; next automatic cleanup: T
+reaped                  2
+released leases         0
+expired reservations    0
+marked missing          0
+restored                0
+next automatic cleanup  30
 ```
 
-Cleanup is conservative:
+Cleanup is conservative by default:
 
 1. The first observation of an absent directory records `missing_since`.
 2. A later cleanup removes it only when the configured grace period has elapsed.
@@ -386,11 +402,19 @@ Cleanup is conservative:
 4. A grace period of zero still requires two observations: one to mark and a
    subsequent one to reap.
 
+`--force` overrides that model. Every reservation whose directory is absent at
+that moment is reaped in a single pass, regardless of whether it was already
+marked and regardless of `missing_for`. The count appears in `reaped`. Forcing
+never touches a reservation whose directory exists, never removes files, and
+never stops a process bound to a released port. There is no short form; the
+flag is spelled `--force` so it cannot be typed by accident.
+
 Every registry command performs the inexpensive expiration sweep needed for
-leases and explicit reservation expirations. Missing-directory observation runs
-explicitly through `clean` and automatically before `lease` or `reserve` when the
-number of directory reservations is at least the registry's current automatic
-cleanup trigger.
+leases and explicit reservation expirations. Missing-directory marking and
+restoration also run during `list`, which already stats each directory.
+Reaping runs explicitly through `clean` and automatically before `lease` or
+`reserve` when the number of directory reservations is at least the registry's
+current automatic cleanup trigger.
 
 The trigger starts at `cleanup_trigger_start`, which defaults to 30 directory
 reservations. After an allocation-triggered sweep reaps no more than 10
@@ -468,8 +492,9 @@ existing `missing_since` timestamp; it does not restart their grace period.
 - `release`: `Released ` followed by space-separated ports.
 - `info`: stable tab-separated records with UTC RFC 3339 timestamps.
 - `listeners`: aligned columns of visible TCP listeners and owning processes.
-- `list`: allocations grouped by directory, with locale-formatted local times.
-- `clean`: the stable counter summary documented above.
+- `list`: allocations grouped by directory, with locale-formatted local times,
+  and a trailing missing-directory count when any reservation is missing.
+- `clean`: aligned label and count columns, led by `reaped`.
 - bare `config`: aligned columns of effective values, defaults, and set status.
 - `config get`: the canonical value only.
 - `config set`: `KEY=VALUE` using the canonical stored representation.

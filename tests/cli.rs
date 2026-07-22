@@ -543,6 +543,56 @@ fn config_and_missing_directory_cleanup_are_persistent() {
 }
 
 #[test]
+fn clean_force_reaps_missing_directories_in_one_pass() {
+    let (_temporary, state, workspace) = fixture();
+    run(porta(&state).arg("reserve").arg(&workspace));
+    fs::remove_dir(&workspace).expect("remove disposable workspace");
+
+    // The default grace period is a week, so an unforced clean only marks.
+    let observed = json_output(porta(&state).args(["clean", "--json"]));
+    assert_eq!(observed["marked_missing"], 1);
+    assert_eq!(observed["reaped"], 0);
+
+    let forced = json_output(porta(&state).args(["clean", "--force", "--json"]));
+    assert_eq!(forced["reaped"], 1);
+    let listed = json_output(porta(&state).args(["list", "--json"]));
+    assert!(
+        listed["reservations"]
+            .as_array()
+            .expect("reservations")
+            .is_empty()
+    );
+
+    // --force is long-form only.
+    let output = porta(&state)
+        .args(["clean", "-f", "--json"])
+        .output()
+        .expect("porta should execute");
+    assert_eq!(output.status.code(), Some(2));
+}
+
+#[test]
+fn list_marks_missing_directories_and_restores_returning_ones() {
+    let (_temporary, state, workspace) = fixture();
+    run(porta(&state).arg("reserve").arg(&workspace));
+    fs::remove_dir(&workspace).expect("remove disposable workspace");
+
+    let listed = json_output(porta(&state).args(["list", "--json"]));
+    assert_eq!(listed["reservations"][0]["status"], "missing");
+    assert!(!listed["reservations"][0]["missing_since"].is_null());
+
+    let plain = run(porta(&state).arg("list"));
+    let plain = String::from_utf8(plain.stdout).expect("UTF-8 list output");
+    assert!(plain.contains("(missing)"));
+    assert!(plain.contains("1 missing directory marked for cleanup"));
+
+    fs::create_dir(&workspace).expect("restore workspace");
+    let restored = json_output(porta(&state).args(["list", "--json"]));
+    assert_eq!(restored["reservations"][0]["status"], "active");
+    assert!(restored["reservations"][0]["missing_since"].is_null());
+}
+
+#[test]
 fn bare_config_lists_effective_defaults_and_explicit_settings() {
     let temporary = tempfile::tempdir().expect("temporary directory");
     let state = temporary.path().join("state");

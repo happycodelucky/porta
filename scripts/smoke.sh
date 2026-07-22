@@ -77,4 +77,12 @@ renewed_lease="$("${binary}" lease -t 3m -k smoke)"
 cleaned="$("${binary}" clean --json)"
 assert_json_type "${cleaned}" "clean"
 
+doomed="${smoke_root}/doomed"
+mkdir "${doomed}"
+"${binary}" reserve -k web "${doomed}" >/dev/null
+rmdir "${doomed}"
+forced="$("${binary}" clean --force --json)"
+assert_json_type "${forced}" "clean"
+[[ "${forced}" == *'"reaped":1'* ]] || die "Forced cleanup did not reap the missing directory"
+
 echo "porta smoke test passed"

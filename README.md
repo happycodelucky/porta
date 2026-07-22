@@ -209,10 +209,29 @@ combined with `--key` or a directory, and it's atomic: if any requested port
 isn't registered, nothing changes. Releasing never terminates the process
 bound to a port.
 
-Deleted worktrees aren't reaped on sight. `clean` marks a missing directory
-with a timestamp and only reclaims it after a grace period (a week by
-default). Cleanup also runs automatically once you accumulate enough
-reservations.
+Deleted worktrees aren't reaped on sight. A missing directory gets marked with
+a timestamp — by `list` or `clean`, whichever notices first — and is only
+reclaimed after a grace period (a week by default). If the worktree comes
+back, the mark clears itself. Cleanup also runs automatically once you
+accumulate enough reservations.
+
+Impatient? `--force` reaps every currently-missing directory in one pass:
+
+```bash
+porta clean --force
+```
+
+```text
+reaped                  2
+released leases         0
+expired reservations    0
+marked missing          0
+restored                0
+next automatic cleanup  30
+```
+
+It only drops registry entries for directories that are gone right now — it
+never touches files, live reservations, or processes.
 
 ### JSON for scripts and agents
 

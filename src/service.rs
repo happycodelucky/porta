@@ -532,6 +532,7 @@ impl PortaService {
         let now = OffsetDateTime::now_utc();
         let mut transaction = self.registry.begin(config.cleanup_trigger_start)?;
         sweep_expired(&mut transaction, now)?;
+        observe_directories(transaction.registry_mut(), now);
         let mut reservations = transaction.registry().reservations.clone();
         reservations.sort_by(|left, right| left.directory.cmp(&right.directory));
         let views: Vec<ReservationView> = reservations
@@ -567,12 +568,12 @@ impl PortaService {
         })
     }
 
-    pub fn clean(&self) -> Result<CleanResult> {
+    pub fn clean(&self, force: bool) -> Result<CleanResult> {
         let config = self.config.load()?;
         let now = OffsetDateTime::now_utc();
         let mut transaction = self.registry.begin(config.cleanup_trigger_start)?;
         let expiration = sweep_expired(&mut transaction, now)?;
-        let missing = observe_missing(transaction.registry_mut(), &config, now)?;
+        let missing = observe_missing(transaction.registry_mut(), &config, now, force)?;
         let cleanup_trigger = transaction.registry().maintenance.cleanup_trigger;
         transaction.commit()?;
         Ok(CleanResult {
@@ -700,6 +701,7 @@ fn observe_missing(
     registry: &mut Registry,
     config: &Config,
     now: OffsetDateTime,
+    force: bool,
 ) -> Result<MissingStats> {
     let grace = time::Duration::try_from(config.missing_for)
         .map_err(|_| PortaError::invalid("invalid_config", "missing_for duration is too large"))?;
@@ -711,6 +713,10 @@ fn observe_missing(
                 stats.restored += 1;
             }
             registry.reservations.push(reservation);
+        } else if force {
+            // Forced cleanup skips both the marking observation and the grace
+            // period, so a directory absent right now is reaped in one pass.
+            stats.reaped += 1;
         } else if let Some(missing_since) = reservation.missing_since {
             if now - missing_since >= grace {
                 stats.reaped += 1;
@@ -726,6 +732,20 @@ fn observe_missing(
     Ok(stats)
 }
 
+/// Records the directory state `list` has to stat anyway: a newly absent
+/// directory is marked so its grace period starts, and a directory that came
+/// back is unmarked. Reaping stays in `clean`, so listing never removes a
+/// reservation.
+fn observe_directories(registry: &mut Registry, now: OffsetDateTime) {
+    for reservation in &mut registry.reservations {
+        if reservation.directory.is_dir() {
+            reservation.missing_since = None;
+        } else if reservation.missing_since.is_none() {
+            reservation.missing_since = Some(now);
+        }
+    }
+}
+
 fn automatic_cleanup(
     transaction: &mut RegistryTransaction,
     config: &Config,
@@ -736,7 +756,7 @@ fn automatic_cleanup(
     {
         return Ok(());
     }
-    let stats = observe_missing(transaction.registry_mut(), config, now)?;
+    let stats = observe_missing(transaction.registry_mut(), config, now, false)?;
     if stats.reaped <= CLEANUP_LOW_YIELD_MAX {
         let trigger = transaction.registry().maintenance.cleanup_trigger;
         transaction.registry_mut().maintenance.cleanup_trigger = trigger
@@ -814,10 +834,12 @@ fn reservation_view(reservation: &Reservation) -> ReservationView {
         created_at: reservation.created_at,
         expires_at: reservation.expires_at,
         missing_since: reservation.missing_since,
-        status: if reservation.directory.is_dir() {
-            "active".to_owned()
-        } else {
+        // `observe_directories` has already synchronized `missing_since` with
+        // the filesystem, so this needs no second stat per reservation.
+        status: if reservation.missing_since.is_some() {
             "missing".to_owned()
+        } else {
+            "active".to_owned()
         },
         ports,
         keyed_ports,

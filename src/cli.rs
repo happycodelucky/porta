@@ -15,7 +15,7 @@ use crate::config::ConfigEntry;
 use crate::duration::format_timestamp;
 use crate::error::{PortaError, Result};
 use crate::listeners::{ListenerEntry, ListenerOrder, ListenersResult};
-use crate::service::{ListResult, PortInfo, PortaService, ReserveRequest};
+use crate::service::{CleanResult, ListResult, PortInfo, PortaService, ReserveRequest};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -49,7 +49,7 @@ enum Command {
     #[command(about = "Release reserved ports or leases")]
     Release(ReleaseArgs),
     #[command(about = "Sweep and clean the registry")]
-    Clean,
+    Clean(CleanArgs),
     #[command(about = "List, read, or update configuration")]
     Config(ConfigArgs),
 }
@@ -150,6 +150,12 @@ struct ListenersArgs {
         help = "Order rows by column"
     )]
     order: ListenerOrder,
+}
+
+#[derive(Debug, Args)]
+struct CleanArgs {
+    #[arg(long, help = "Reap missing directories now, skipping the grace period")]
+    force: bool,
 }
 
 #[derive(Debug, Args)]
@@ -378,20 +384,12 @@ fn execute(service: &PortaService, command: Command, json_output: bool) -> Resul
                 println!("{}", format_list(&result)?);
             }
         }
-        Command::Clean => {
-            let result = service.clean()?;
+        Command::Clean(arguments) => {
+            let result = service.clean(arguments.force)?;
             if json_output {
                 emit_success(ResponseType::Clean, &result)?;
             } else {
-                println!(
-                    "Released leases: {}; expired reservations: {}; marked missing: {}; restored: {}; reaped: {}; next automatic cleanup: {}",
-                    result.released_leases,
-                    result.expired_reservations,
-                    result.marked_missing,
-                    result.restored,
-                    result.reaped,
-                    result.cleanup_trigger
-                );
+                println!("{}", format_clean(&result));
             }
         }
         Command::Config(arguments) => match arguments.action {
@@ -537,6 +535,21 @@ fn format_ports(ports: &[u16]) -> String {
         .join(" ")
 }
 
+fn format_clean(result: &CleanResult) -> String {
+    let mut table = borderless_table(&[]);
+    for (label, value) in [
+        ("reaped", result.reaped),
+        ("released leases", result.released_leases),
+        ("expired reservations", result.expired_reservations),
+        ("marked missing", result.marked_missing),
+        ("restored", result.restored),
+        ("next automatic cleanup", result.cleanup_trigger),
+    ] {
+        table.add_row([label.to_owned(), value.to_string()]);
+    }
+    render_columns(&mut table)
+}
+
 fn format_list(result: &ListResult) -> Result<String> {
     let mut sections = Vec::with_capacity(result.reservations.len() + 1);
     for reservation in &result.reservations {
@@ -573,6 +586,21 @@ fn format_list(result: &ListResult) -> Result<String> {
             ]);
         }
         sections.push(format!("leases\n{}", indent(&render_columns(&mut table))));
+    }
+    let missing = result
+        .reservations
+        .iter()
+        .filter(|reservation| reservation.status == "missing")
+        .count();
+    if missing > 0 {
+        let noun = if missing == 1 {
+            "directory"
+        } else {
+            "directories"
+        };
+        sections.push(format!(
+            "{missing} missing {noun} marked for cleanup - run `porta clean` to release."
+        ));
     }
     Ok(sections.join("\n\n"))
 }
