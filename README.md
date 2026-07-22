@@ -1,5 +1,6 @@
 # Port Authority
 
+[![CI](https://img.shields.io/github/actions/workflow/status/happycodelucky/porta/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/happycodelucky/porta/actions/workflows/ci.yml)
 ![Rust 1.93+](https://img.shields.io/badge/Rust-1.93%2B-CE422B.svg?style=for-the-badge&logo=rust&logoColor=white)
 ![macOS](https://img.shields.io/badge/macOS-ARM64%20%7C%20x86--64-blue.svg?style=for-the-badge&logo=apple)
 ![Linux](https://img.shields.io/badge/Linux-ARM64%20%7C%20x86--64-FCC624.svg?style=for-the-badge&logo=linux&logoColor=black)

@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-22.04, macos-15]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v4
+
+      # Formatting, Clippy on the pinned minimum Rust, unit and integration
+      # tests, and ShellCheck.
+      - run: mise run check
+
+      # Builds the release binary and exercises it end to end against an
+      # isolated PORTA_HOME.
+      - run: mise run smoke
+
+  lint-stable:
+    name: lint (stable Rust)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v4
+
+      # Guards against breakage from the moving stable toolchain, separately
+      # from the pinned minimum version the check job uses.
+      - run: mise run lint-stable
+
+  audit:
+    name: dependency audit
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v4
+
+      - run: mise run audit

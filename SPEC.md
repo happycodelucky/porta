@@ -1286,18 +1286,44 @@ requirements.
 
 ### 13.5 Release automation
 
-The release workflow should:
+Two GitHub Actions workflows implement this.
 
-1. Require a clean, reviewed commit and passing CI.
-2. Derive one SemVer version shared by the crate, tag, and binaries.
-3. Build and test the supported target matrix.
-4. Publish GitHub archives and checksums.
-5. Publish the crate to crates.io.
-6. Update the Homebrew tap.
-7. Verify installation from Cargo, a release archive, and mise.
+`.github/workflows/ci.yml` runs on pushes to `main` and on pull requests. It
+runs `mise run check` and `mise run smoke` on Linux and macOS, plus
+`mise run lint-stable` and `mise run audit`.
 
-Publishing credentials must use scoped tokens or trusted publishing and must
-never be stored in the repository.
+`.github/workflows/release.yml` runs when a `v*` tag is pushed, and can be
+dispatched manually against an existing tag:
+
+1. A build matrix compiles each supported target natively on its own runner,
+   so no cross-compilation is involved and every binary is exercised by
+   `mise run smoke` on the platform it ships to. Linux targets build on
+   Ubuntu 22.04 to keep the glibc floor low enough for older distributions.
+
+   | Target | Runner |
+   | --- | --- |
+   | `aarch64-apple-darwin` | `macos-15` |
+   | `x86_64-apple-darwin` | `macos-15-intel` |
+   | `aarch64-unknown-linux-gnu` | `ubuntu-22.04-arm` |
+   | `x86_64-unknown-linux-gnu` | `ubuntu-22.04` |
+
+2. Each job packages `porta-v<version>-<target>.tar.gz` containing the binary,
+   license, and README at the archive root, alongside its SHA-256.
+3. The release job verifies the tag matches the `Cargo.toml` version, then
+   publishes the archives and a combined `SHA256SUMS` to a GitHub release.
+4. The Homebrew job renders `packaging/homebrew/porta.rb.in` through
+   `scripts/render-formula.sh`, recomputing each checksum from the archives
+   themselves, and commits the result to the tap repository.
+
+Because the built-in `GITHUB_TOKEN` cannot write to another repository, the tap
+update requires a `HOMEBREW_TAP_TOKEN` secret holding a scoped personal access
+token with contents write permission on the tap. When that secret is absent the
+release still completes and only the tap update is skipped with a warning.
+
+Publishing to crates.io stays a deliberate manual step, because publishing a
+version is irreversible. It runs from a verified checkout after the tagged
+release exists. Publishing credentials must use scoped tokens or trusted
+publishing and must never be stored in the repository.
 
 ## 14. Security and resilience
 

@@ -1,0 +1,188 @@
+name: Release
+
+# Tagging v0.1.0 builds every supported binary, publishes a checksummed GitHub
+# release, and updates the Homebrew tap formula.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build and release
+        required: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # Repository that hosts the Homebrew formula, as OWNER/homebrew-<name>.
+  # `brew install happycodelucky/tap/porta` resolves to happycodelucky/homebrew-tap.
+  TAP_REPOSITORY: happycodelucky/homebrew-tap
+
+jobs:
+  build:
+    name: build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every target builds natively on its own runner, so there is no
+        # cross-compilation and each binary is smoke-tested on the platform it
+        # ships to. Linux builds use 22.04 so the glibc floor stays low enough
+        # for older distributions.
+        include:
+          - target: aarch64-apple-darwin
+            runner: macos-15
+          - target: x86_64-apple-darwin
+            runner: macos-15-intel
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-22.04-arm
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: jdx/mise-action@v4
+
+      - name: Confirm the runner is the expected target
+        run: |
+          host="$(rustc -vV | awk '/^host:/ { print $2 }')"
+          if [ "$host" != "${{ matrix.target }}" ]; then
+            echo "::error::runner host $host does not match ${{ matrix.target }}"
+            exit 1
+          fi
+
+      # Runs fmt, Clippy, tests, ShellCheck, the release build, and the smoke
+      # test, so nothing ships that has not passed the full gate on this
+      # platform.
+      - name: Build and verify
+        run: mise run smoke
+
+      - name: Package archive
+        id: package
+        run: |
+          version="${{ inputs.tag || github.ref_name }}"
+          version="${version#v}"
+          name="porta-v${version}-${{ matrix.target }}"
+          staging="$(mktemp -d)"
+          cp target/release/porta LICENSE README.md "$staging/"
+          tar czf "${name}.tar.gz" -C "$staging" .
+          shasum -a 256 "${name}.tar.gz" > "${name}.tar.gz.sha256"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: |
+            porta-v*.tar.gz
+            porta-v*.tar.gz.sha256
+          if-no-files-found: error
+
+  release:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Confirm the tag matches Cargo.toml
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          version="${tag#v}"
+          manifest="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
+          if [ "$version" != "$manifest" ]; then
+            echo "::error::tag $tag does not match Cargo.toml version $manifest"
+            exit 1
+          fi
+
+      - name: Collect checksums
+        working-directory: artifacts
+        run: cat ./*.sha256 | tee SHA256SUMS
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          gh release create "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$tag" \
+            --generate-notes \
+            --verify-tag \
+            artifacts/*.tar.gz artifacts/SHA256SUMS
+
+  homebrew:
+    name: update Homebrew tap
+    needs: release
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      # Pushing to another repository needs a PAT; the built-in GITHUB_TOKEN is
+      # scoped to this one. Without it the release still succeeds and only the
+      # tap update is skipped.
+      - name: Check for the tap token
+        id: token
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -n "$TAP_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::HOMEBREW_TAP_TOKEN is not set; skipping the tap update"
+          fi
+
+      - name: Render the formula
+        if: steps.token.outputs.present == 'true'
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          owner="${GITHUB_REPOSITORY%%/*}"
+          scripts/render-formula.sh "${tag#v}" "$owner" artifacts > porta.rb
+          cat porta.rb
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.present == 'true'
+        with:
+          repository: ${{ env.TAP_REPOSITORY }}
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Commit the formula
+        if: steps.token.outputs.present == 'true'
+        working-directory: tap
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          mkdir -p Formula
+          cp ../porta.rb Formula/porta.rb
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- Formula/porta.rb; then
+            echo "Formula already current for $tag"
+            exit 0
+          fi
+          git add Formula/porta.rb
+          git commit -m "porta $tag"
+          git push
