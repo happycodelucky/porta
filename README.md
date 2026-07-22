@@ -46,7 +46,7 @@ Fetch the prebuilt binary straight from the GitHub release — no Rust toolchain
 needed:
 
 ```bash
-mise use -g ubi:happycodelucky/porta
+mise use -g github:happycodelucky/porta
 ```
 
 Or build it from the crate, if you'd rather:

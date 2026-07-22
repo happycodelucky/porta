@@ -1307,12 +1307,16 @@ Before publishing:
 
 ### 13.3 mise
 
-The `ubi` backend installs a released binary without a Rust toolchain, which is
+The GitHub backend installs a released binary without a Rust toolchain, which is
 the recommended path on Linux:
 
 ```console
-$ mise use -g ubi:OWNER/porta
+$ mise use -g github:OWNER/porta
 ```
+
+This supersedes the `ubi` backend, which mise deprecated in favor of `github`.
+The replacement adds provenance verification and drops the external `ubi`
+dependency.
 
 The Cargo backend provides an immediate installation path after crates.io
 publication:
@@ -1323,8 +1327,8 @@ $ mise use -g cargo:port-authority@latest
 ```
 
 Git-based installation can be documented before the first crates.io release.
-Prebuilt GitHub artifacts should also be compatible with mise's `ubi` or GitHub
-backend so users are not required to compile Rust.
+Release archive names must stay compatible with the GitHub backend's asset
+detection so users are not required to compile Rust.
 
 After public releases are stable, submit a `porta` shorthand to the mise
 registry, preferring a verified prebuilt backend with
@@ -1340,16 +1344,45 @@ insufficient.
 
 ### 13.4 Homebrew
 
-Maintain a formula in a public tap initially:
+Homebrew distribution happens in two stages, through two different formulae.
+
+A public tap carries the project until it is established:
 
 ```console
 $ brew install OWNER/tap/porta
 ```
 
-The formula installs immutable, checksummed release artifacts and tests both
-`porta --version` and an isolated `porta lease` call. Submission to Homebrew Core
-can be considered after the project meets its notability and maintenance
-requirements.
+The tap formula, `packaging/homebrew/porta.rb.in`, installs immutable
+checksummed release archives and is updated automatically by the release
+workflow.
+
+`homebrew/core` is the eventual destination, and it does not accept the tap
+formula. Its published policy requires that a formula "must either build from
+source or install portable, platform-independent output," so a core formula
+compiles the crate with `depends_on "rust" => :build` and Homebrew's own CI
+produces the bottles users download. The reference version is
+`packaging/homebrew/porta-core.rb`.
+
+Core acceptance also requires an immutable tag identifying a stable release, an
+open-source licence compatible with the Debian Free Software Guidelines, and a
+formula that builds and passes its tests on the entire `homebrew/core`
+continuous-integration matrix. Port Authority satisfies the licence requirement
+and reserves both the `porta` and `port-authority` formula names, neither of
+which currently exists in core.
+
+The published policy no longer states popularity thresholds, but maintainers
+still decline software with no demonstrated use. Submission is therefore
+deliberately sequenced after the tap has real users, rather than attempted at
+first release.
+
+Submission runs through a fork of `homebrew/core`, validated locally with
+`brew install --build-from-source`, `brew test`, `brew audit --strict --new
+--online`, and `brew style`. Once a formula is in core, version bumps are
+largely handled by Homebrew's automation rather than by this repository's
+release workflow.
+
+The two channels can coexist during the transition. Once core carries the
+formula, the tap should be deprecated so a single version is authoritative.
 
 ### 13.5 Debian packages
 
@@ -1483,8 +1516,8 @@ publishing and must never be stored in the repository.
 
 ## 17. Remaining release decisions
 
-- Whether prebuilt mise installation should prefer `ubi`, `github`, or an Aqua
-  registry entry.
+- Whether a mise registry shorthand should resolve through the GitHub backend or
+  an Aqua registry entry.
 - The benchmark workloads and release-binary size target for the first public
   stable release.
 - Whether a future privileged mode should coordinate reservations across users.
