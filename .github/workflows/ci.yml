@@ -19,7 +19,7 @@ jobs:
       matrix:
         runner: [ubuntu-22.04, macos-15]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: jdx/mise-action@v4
 
@@ -35,7 +35,7 @@ jobs:
     name: lint (stable Rust)
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: jdx/mise-action@v4
 
@@ -47,7 +47,7 @@ jobs:
     name: dependency audit
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: jdx/mise-action@v4
 

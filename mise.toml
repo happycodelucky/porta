@@ -6,16 +6,29 @@ shellcheck = "latest"
 "cargo:cargo-audit" = "latest"
 "cargo:cargo-deb" = "latest"
 
+[tasks.toolchain]
+description = "Materialize the pinned Rust toolchain and its components"
+# `check` runs fmt, lint, and test in parallel. Where the pinned toolchain is not
+# installed yet, each of those makes rustup fetch it, and the concurrent installs
+# race on a shared download directory: one renames the partial file and the
+# others fail with "could not rename 'downloaded' file". Depending on this task
+# first makes rustup do the work once, serially. Each command below pulls a
+# different component, so none is left to be fetched under parallelism.
+run = ["rustc --version", "cargo fmt --version", "cargo clippy --version"]
+
 [tasks.fmt]
 description = "Check Rust formatting"
+depends = ["toolchain"]
 run = "cargo fmt --all --check"
 
 [tasks.format]
 description = "Format Rust sources"
+depends = ["toolchain"]
 run = "cargo fmt --all"
 
 [tasks.lint]
 description = "Run Clippy with warnings denied"
+depends = ["toolchain"]
 run = "cargo clippy --all-targets --all-features -- -D warnings"
 
 [tasks.lint-stable]
@@ -24,6 +37,7 @@ run = "mise exec rust@stable -- cargo clippy --all-targets --all-features -- -D 
 
 [tasks.test]
 description = "Run the Rust test suite"
+depends = ["toolchain"]
 run = "cargo test --all-features"
 
 [tasks.shellcheck]
