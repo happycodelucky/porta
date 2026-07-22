@@ -44,6 +44,9 @@ needs a port without a directory reservation.
 - Port Authority does not launch, supervise, or stop applications.
 - Port Authority does not terminate processes occupying ports.
 - Port Authority does not allocate UDP ports in the initial release.
+- Port Authority does not support Windows natively in version 1. The supported
+  targets are macOS and Linux. Windows users run it under WSL2 with the Linux
+  binary. Section 10.4 records what native support would require.
 - Port Authority does not synchronize reservations between hosts.
 - Port Authority does not initially coordinate different operating-system
   users. A home-directory registry is host-wide only for the current user.
@@ -1078,6 +1081,54 @@ The logical model and public JSON representation remain contracts. Internal
 types and the selected physical store may change only when schema compatibility
 and migration behavior remain explicit.
 
+### 10.4 Windows portability
+
+Windows is out of scope for version 1, as stated in section 3. This records the
+state of the code so the decision can be revisited against facts rather than
+guesses.
+
+Several things already port. Locking uses `std::fs::File::try_lock`, which the
+standard library implements on Windows through `LockFileEx`, so the transaction
+design needs no change. The `listeners` crate supports Windows, so operating
+system listener and process inspection works. Every file-permission call site is
+already behind `#[cfg(unix)]` with a non-Unix branch. The socket prober
+deliberately never sets `SO_REUSEADDR`, which matters here because on Windows
+that option permits binding over a live socket rather than merely relaxing
+`TIME_WAIT`; setting it would make availability probes report false positives.
+
+Three defects block a native port. All are runtime failures rather than
+compilation errors, so a Windows build succeeds and then fails on first use. A
+compile-only Windows job would report success and prove nothing; a meaningful
+signal has to run the test suite.
+
+1. `state.rs` resolves the state directory and `~` expansion from `HOME`, which
+   Windows does not define. It would need `USERPROFILE`. Without it every
+   command that does not set `PORTA_HOME` fails at startup.
+2. `atomic.rs` makes the parent directory durable by opening it as a file and
+   calling `sync_all`. Windows rejects opening a directory handle that way, so
+   every registry and configuration write fails. Windows has no equivalent of
+   directory fsync, so the resolution is to compile that step out rather than
+   translate it, and to document that durability rests on the replace operation
+   alone.
+3. `fs::canonicalize` returns UNC paths such as `\\?\C:\path`. Because the
+   canonical directory path is the reservation identity, that prefix would enter
+   the registry, plain output, and JSON.
+
+Beyond those, three behaviors need design rather than translation. The default
+allocation base of `55000` sits inside the Windows ephemeral range of
+`49152..=65535`, where Hyper-V, WSL2, and Docker Desktop reserve large blocks;
+probes correctly treat reserved ports as unavailable, but the default deserves a
+platform-specific value. Replacing a file that another process holds open fails
+on Windows without `FILE_SHARE_DELETE`, so atomic replacement is a weaker
+guarantee than POSIX rename. There is no equivalent of the `0600` and `0700`
+modes, so state privacy would depend on inherited profile permissions.
+
+Native support also means Windows joins the conformance and stress matrix in
+section 12.3. The guarantee that concurrent processes never receive the same
+port rests on file locking and atomic replacement, which are the two behaviors
+that differ most on Windows, so claiming support is an ongoing verification
+commitment rather than a one-time port.
+
 ## 11. Development tooling
 
 ### 11.1 mise
@@ -1229,9 +1280,9 @@ Each signed version tag should produce checksummed archives containing the
 Each release also carries a `.deb` per Linux architecture and a `SHA256SUMS`
 file covering every artifact.
 
-Musl and Windows targets may be added after platform behavior is specified and
-tested. Release automation should generate provenance or attestations where the
-chosen release tool supports them.
+Musl targets may be added after platform behavior is specified and tested.
+Windows is deferred; see sections 3 and 10.4. Release automation should generate
+provenance or attestations where the chosen release tool supports them.
 
 ### 13.2 Cargo
 
@@ -1432,10 +1483,8 @@ publishing and must never be stored in the repository.
 
 ## 17. Remaining release decisions
 
-- Which release builder will generate cross-platform binaries and checksums.
 - Whether prebuilt mise installation should prefer `ubi`, `github`, or an Aqua
   registry entry.
-- Whether Windows support belongs in v1 or a later release.
 - The benchmark workloads and release-binary size target for the first public
   stable release.
 - Whether a future privileged mode should coordinate reservations across users.

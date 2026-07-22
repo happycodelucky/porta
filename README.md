@@ -91,6 +91,16 @@ Checksummed archives for macOS and Linux (ARM64 and x86-64) are attached to
 each [release](https://github.com/happycodelucky/porta/releases), with a
 `SHA256SUMS` file to verify against. Extract `porta` onto your `PATH`.
 
+### Windows
+
+There's no native Windows build. Run porta inside WSL2 and follow the Linux
+instructions above — worktrees and dev servers hosted in WSL2 get the same
+coordination they would on Linux. Ports you bind in WSL2 are reachable from
+Windows, so this covers most of what you'd want it for.
+
+Native Windows support isn't in v1. What it would take is written up in
+[SPEC.md](SPEC.md#104-windows-portability), if you want to make the case.
+
 ### From source
 
 ```bash
