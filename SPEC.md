@@ -1226,6 +1226,9 @@ Each signed version tag should produce checksummed archives containing the
 - Linux x86-64 GNU
 - Linux ARM64 GNU
 
+Each release also carries a `.deb` per Linux architecture and a `SHA256SUMS`
+file covering every artifact.
+
 Musl and Windows targets may be added after platform behavior is specified and
 tested. Release automation should generate provenance or attestations where the
 chosen release tool supports them.
@@ -1239,6 +1242,12 @@ an unrelated project. The binary name remains `porta`.
 $ cargo install port-authority --locked
 ```
 
+`[package.metadata.binstall]` lets `cargo binstall port-authority` fetch a
+released archive instead of compiling. Its `pkg-url` is written out in full
+because the crate name is `port-authority` while the archive and binary are
+`porta`, and because the archives end in `.tar.gz` rather than the `.tgz` that
+`{ archive-suffix }` expands to.
+
 Before publishing:
 
 - Populate license, description, repository, homepage, readme, keywords, and
@@ -1246,6 +1255,13 @@ Before publishing:
 - Run `cargo publish --dry-run` and inspect `cargo package --list`.
 
 ### 13.3 mise
+
+The `ubi` backend installs a released binary without a Rust toolchain, which is
+the recommended path on Linux:
+
+```console
+$ mise use -g ubi:OWNER/porta
+```
 
 The Cargo backend provides an immediate installation path after crates.io
 publication:
@@ -1284,7 +1300,36 @@ The formula installs immutable, checksummed release artifacts and tests both
 can be considered after the project meets its notability and maintenance
 requirements.
 
-### 13.5 Release automation
+### 13.5 Debian packages
+
+`cargo-deb` builds a `.deb` per Linux architecture from the same release binary
+the smoke test verified, driven by `[package.metadata.deb]` and the `deb` mise
+task. The package is named `porta` for the command rather than `port-authority`
+for the crate, and carries no Debian revision suffix because this project is
+itself the upstream. It installs `/usr/bin/porta` plus the README and license
+under `/usr/share/doc/porta/`.
+
+```console
+$ sudo apt install ./porta_0.1.0_amd64.deb
+```
+
+Dependencies resolve through `dpkg-shlibdeps`, which `cargo-deb` only warns
+about when unavailable. Release automation must therefore reject a package
+whose `Depends` field is empty rather than shipping one that fails to declare
+its glibc floor.
+
+Packages are attached to GitHub releases and installed from the file. Hosting a
+signed APT repository, so that `apt install porta` resolves without a path, is
+deliberately deferred until there is demand for it; it would add key management
+and repository hosting to the release process.
+
+Snap and Flatpak are not suitable for this tool. Both confine the application,
+while `porta listeners` must enumerate other processes' sockets and owning PIDs,
+and reservations address arbitrary directories anywhere on the filesystem. Under
+strict confinement those capabilities require interfaces that are not connected
+automatically, so the command would appear to succeed while reporting nothing.
+
+### 13.6 Release automation
 
 Two GitHub Actions workflows implement this.
 

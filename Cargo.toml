@@ -15,6 +15,30 @@ categories = ["command-line-utilities", "development-tools"]
 name = "porta"
 path = "src/main.rs"
 
+# Lets `cargo binstall` fetch a released binary instead of compiling. The URL is
+# spelled out because the crate is `port-authority` while the archive and binary
+# are `porta`, and because the release archives end in `.tar.gz` rather than the
+# `.tgz` that `{ archive-suffix }` would produce.
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/porta-v{ version }-{ target }.tar.gz"
+pkg-fmt = "tgz"
+bin-dir = "{ bin }{ binary-ext }"
+
+# The Debian package is named for the command rather than the crate.
+[package.metadata.deb]
+name = "porta"
+maintainer = "Paul Bates <paul@happycodelucky.com>"
+section = "utils"
+priority = "optional"
+# Upstream ships this package itself, so there is no downstream Debian revision
+# to track. Without this the filename would carry a "-1" suffix.
+revision = ""
+extended-description = """
+Port Authority coordinates local TCP ports across git worktrees, coding agents,
+sandboxes, and parallel application instances. Reservations are durable and keyed
+to a directory; leases are short-lived and renewable. State lives in a per-user
+registry guarded by a file lock, so no daemon runs."""
+
 [dependencies]
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std", "unstable-locales"] }
 clap = { version = "4.6.4", features = ["derive"] }

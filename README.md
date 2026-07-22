@@ -34,23 +34,52 @@ flag for exactly this — the recipes below use it.
 
 ### Homebrew
 
+Works on macOS and Linux alike:
+
 ```bash
 brew install happycodelucky/tap/porta
 ```
 
 ### mise
 
+Fetch the prebuilt binary straight from the GitHub release — no Rust toolchain
+needed:
+
+```bash
+mise use -g ubi:happycodelucky/porta
+```
+
+Or build it from the crate, if you'd rather:
+
 ```bash
 mise use -g cargo:port-authority@latest
 ```
 
 Once the shorthand lands in the mise registry, `mise use -g porta@latest` will
-do the same thing without the Cargo backend.
+do the same thing.
+
+### Debian and Ubuntu
+
+Every release ships `.deb` packages for amd64 and arm64:
+
+```bash
+sudo apt install ./porta_0.1.0_amd64.deb
+```
+
+There's no APT repository to add — download the `.deb` from the
+[releases page](https://github.com/happycodelucky/porta/releases) and install
+the file directly. `sudo apt remove porta` uninstalls it.
 
 ### Cargo
 
 ```bash
 cargo install port-authority --locked
+```
+
+That compiles from source. To grab the released binary instead:
+
+```bash
+cargo binstall port-authority
 ```
 
 The crates.io package is `port-authority` because `porta` was already taken by
@@ -59,8 +88,8 @@ an unrelated project. The binary it installs is still `porta`.
 ### Prebuilt binaries
 
 Checksummed archives for macOS and Linux (ARM64 and x86-64) are attached to
-each [release](https://github.com/happycodelucky/porta/releases). Download,
-verify, and drop `porta` somewhere on your `PATH` — no Rust toolchain needed.
+each [release](https://github.com/happycodelucky/porta/releases), with a
+`SHA256SUMS` file to verify against. Extract `porta` onto your `PATH`.
 
 ### From source
 

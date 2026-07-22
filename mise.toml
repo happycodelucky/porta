@@ -4,6 +4,7 @@ min_version = "2025.7.12"
 rust = "1.93.1"
 shellcheck = "latest"
 "cargo:cargo-audit" = "latest"
+"cargo:cargo-deb" = "latest"
 
 [tasks.fmt]
 description = "Check Rust formatting"
@@ -47,6 +48,11 @@ run = "cargo install --path . --locked --force"
 description = "Run the isolated end-to-end CLI smoke test"
 depends = ["build"]
 run = "bash scripts/smoke.sh"
+
+[tasks.deb]
+description = "Package the release binary as a Debian package"
+depends = ["build"]
+run = "cargo deb --no-build"
 
 [tasks.audit]
 description = "Audit Rust dependencies for known vulnerabilities"

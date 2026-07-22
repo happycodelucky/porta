@@ -2,6 +2,10 @@
 version = "0.22.2"
 backend = "cargo:cargo-audit"
 
+[[tools."cargo:cargo-deb"]]
+version = "3.7.0"
+backend = "cargo:cargo-deb"
+
 [[tools.rust]]
 version = "1.93.1"
 backend = "core:rust"

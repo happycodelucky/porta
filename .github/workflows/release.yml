@@ -76,12 +76,33 @@ jobs:
           shasum -a 256 "${name}.tar.gz" > "${name}.tar.gz.sha256"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
+      # Debian packaging only applies to the Linux targets. cargo-deb reuses the
+      # binary the smoke test just verified rather than rebuilding it, and names
+      # the architecture from the host, so each Linux runner emits its own.
+      - name: Package Debian archive
+        if: runner.os == 'Linux'
+        run: |
+          mise run deb
+          package="$(ls target/debian/*.deb)"
+          # cargo-deb resolves the glibc floor through dpkg-shlibdeps, and only
+          # warns when that tool is unavailable. Fail instead of shipping a
+          # package that silently declares no dependencies at all.
+          if [ -z "$(dpkg-deb --field "$package" Depends)" ]; then
+            echo "::error::$package declares no dependencies; is dpkg-dev installed?"
+            exit 1
+          fi
+          cp "$package" .
+          name="$(basename "$package")"
+          shasum -a 256 "$name" > "${name}.sha256"
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
           path: |
             porta-v*.tar.gz
             porta-v*.tar.gz.sha256
+            porta_*.deb
+            porta_*.deb.sha256
           if-no-files-found: error
 
   release:
@@ -124,7 +145,7 @@ jobs:
             --title "$tag" \
             --generate-notes \
             --verify-tag \
-            artifacts/*.tar.gz artifacts/SHA256SUMS
+            artifacts/*.tar.gz artifacts/*.deb artifacts/SHA256SUMS
 
   homebrew:
     name: update Homebrew tap
