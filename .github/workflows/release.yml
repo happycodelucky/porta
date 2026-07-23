@@ -32,13 +32,12 @@ jobs:
       matrix:
         # Every target builds natively on its own runner, so there is no
         # cross-compilation and each binary is smoke-tested on the platform it
-        # ships to. Linux builds use 22.04 so the glibc floor stays low enough
-        # for older distributions.
+        # ships to. The jobs run in parallel, so the wall clock is one build
+        # rather than the sum. Linux builds use 22.04 so the glibc floor stays
+        # low enough for older distributions.
         include:
           - target: aarch64-apple-darwin
             runner: macos-15
-          - target: x86_64-apple-darwin
-            runner: macos-15-intel
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-22.04-arm
           - target: x86_64-unknown-linux-gnu
@@ -58,9 +57,10 @@ jobs:
             exit 1
           fi
 
-      # Runs fmt, Clippy, tests, ShellCheck, the release build, and the smoke
-      # test, so nothing ships that has not passed the full gate on this
-      # platform.
+      # Builds the release binary and exercises it end to end on this platform.
+      # Formatting, Clippy, and ShellCheck are architecture-independent and CI
+      # already ran them against this commit, so the release does not repeat
+      # them on every runner.
       - name: Build and verify
         run: mise run smoke
 

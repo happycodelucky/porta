@@ -2,7 +2,7 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/happycodelucky/porta/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/happycodelucky/porta/actions/workflows/ci.yml)
 ![Rust 1.93+](https://img.shields.io/badge/Rust-1.93%2B-CE422B.svg?style=for-the-badge&logo=rust&logoColor=white)
-![macOS](https://img.shields.io/badge/macOS-ARM64%20%7C%20x86--64-blue.svg?style=for-the-badge&logo=apple)
+![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon-blue.svg?style=for-the-badge&logo=apple)
 ![Linux](https://img.shields.io/badge/Linux-ARM64%20%7C%20x86--64-FCC624.svg?style=for-the-badge&logo=linux&logoColor=black)
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)
 
@@ -116,9 +116,12 @@ an unrelated project. The binary it installs is still `porta`.
 
 ### Prebuilt binaries
 
-Checksummed archives for macOS and Linux (ARM64 and x86-64) are attached to
-each [release](https://github.com/happycodelucky/porta/releases), with a
-`SHA256SUMS` file to verify against. Extract `porta` onto your `PATH`.
+Checksummed archives for macOS (Apple Silicon) and Linux (ARM64 and x86-64) are
+attached to each [release](https://github.com/happycodelucky/porta/releases),
+with a `SHA256SUMS` file to verify against. Extract `porta` onto your `PATH`.
+
+Intel Macs don't get a prebuilt binary. `cargo install port-authority --locked`
+builds one.
 
 ### Windows
 

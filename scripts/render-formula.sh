@@ -39,7 +39,6 @@ formula="$(cat "${template}")"
 formula="${formula//@VERSION@/${version}}"
 formula="${formula//@GITHUB_OWNER@/${owner}}"
 formula="${formula//@SHA256_MACOS_ARM64@/$(checksum aarch64-apple-darwin)}"
-formula="${formula//@SHA256_MACOS_X86_64@/$(checksum x86_64-apple-darwin)}"
 formula="${formula//@SHA256_LINUX_ARM64@/$(checksum aarch64-unknown-linux-gnu)}"
 formula="${formula//@SHA256_LINUX_X86_64@/$(checksum x86_64-unknown-linux-gnu)}"
 

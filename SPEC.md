@@ -1273,12 +1273,18 @@ Each signed version tag should produce checksummed archives containing the
 `porta` binary, license, and README for:
 
 - macOS ARM64
-- macOS x86-64
 - Linux x86-64 GNU
 - Linux ARM64 GNU
 
 Each release also carries a `.deb` per Linux architecture and a `SHA256SUMS`
 file covering every artifact.
+
+macOS builds are Apple Silicon only. Intel Macs are not a supported target: the
+last Intel Mac shipped in 2023, and the cost is a permanent fourth build and a
+platform that cannot be verified natively as Apple's own toolchain moves on. The
+Homebrew formula declares `depends_on arch: :arm64` so an Intel Mac fails with a
+clear message rather than installing a binary it cannot run. Intel users can
+build from source with Cargo, which is unaffected.
 
 Musl targets may be added after platform behavior is specified and tested.
 Windows is deferred; see sections 3 and 10.4. Release automation should generate
@@ -1432,9 +1438,19 @@ dispatched manually against an existing tag:
    | Target | Runner |
    | --- | --- |
    | `aarch64-apple-darwin` | `macos-15` |
-   | `x86_64-apple-darwin` | `macos-15-intel` |
    | `aarch64-unknown-linux-gnu` | `ubuntu-22.04-arm` |
    | `x86_64-unknown-linux-gnu` | `ubuntu-22.04` |
+
+   The jobs run in parallel, so the wall clock is one build rather than their
+   sum, and a native runner per target is what makes the per-platform smoke test
+   possible. Consolidating targets onto fewer runners would require
+   cross-compilation, serialize the builds, and leave the cross-built binaries
+   unexecutable on the machine that produced them.
+
+   The release builds and smoke tests each target but does not repeat
+   formatting, Clippy, or ShellCheck. Those are architecture-independent and CI
+   gates them on the same commit, so `build` is deliberately independent of
+   `check` in the task graph.
 
 2. Each job packages `porta-v<version>-<target>.tar.gz` containing the binary,
    license, and README at the archive root, alongside its SHA-256.

@@ -7,30 +7,34 @@ shellcheck = "latest"
 "cargo:cargo-deb" = "latest"
 
 [tasks.toolchain]
-description = "Materialize the pinned Rust toolchain with rustfmt and clippy"
-# `check` runs fmt, lint, and test in parallel. mise installs the pinned toolchain
-# through rustup with a minimal profile that omits rustfmt and clippy, and
-# `cargo fmt`/`cargo clippy` error rather than installing them on demand. When the
-# base toolchain is not present yet, the parallel cargo invocations also race to
-# install it and collide in rustup's shared download directory. This task runs
-# first, serially, installing the toolchain and both components in one idempotent
-# step so everything is present before anything runs in parallel. RUSTUP_TOOLCHAIN
-# is set to the pinned version by mise.
-run = "rustup toolchain install \"$RUSTUP_TOOLCHAIN\" --component rustfmt --component clippy --no-self-update --profile minimal"
+description = "Materialize the pinned Rust toolchain"
+# Tasks that run in parallel would otherwise each make rustup install the pinned
+# toolchain, and those concurrent installs collide in rustup's shared download
+# directory. Depending on this task makes the install happen once, serially.
+# RUSTUP_TOOLCHAIN is set to the pinned version by mise.
+run = "rustup toolchain install \"$RUSTUP_TOOLCHAIN\" --no-self-update --profile minimal"
+
+[tasks.toolchain-lint]
+description = "Add rustfmt and clippy to the pinned toolchain"
+# The minimal profile omits both, and `cargo fmt`/`cargo clippy` error rather
+# than installing them on demand. Kept separate from `toolchain` so building and
+# testing, which is all a release does, never pulls the lint components.
+depends = ["toolchain"]
+run = "rustup component add rustfmt clippy"
 
 [tasks.fmt]
 description = "Check Rust formatting"
-depends = ["toolchain"]
+depends = ["toolchain-lint"]
 run = "cargo fmt --all --check"
 
 [tasks.format]
 description = "Format Rust sources"
-depends = ["toolchain"]
+depends = ["toolchain-lint"]
 run = "cargo fmt --all"
 
 [tasks.lint]
 description = "Run Clippy with warnings denied"
-depends = ["toolchain"]
+depends = ["toolchain-lint"]
 run = "cargo clippy --all-targets --all-features -- -D warnings"
 
 [tasks.lint-stable]
@@ -51,8 +55,12 @@ description = "Run formatting, lint, tests, and shell automation checks"
 depends = ["fmt", "lint", "test", "shellcheck"]
 
 [tasks.build]
-description = "Build a validated release binary"
-depends = ["check"]
+description = "Build the release binary"
+# Deliberately independent of `check`. Releases build and smoke test each target
+# natively, while formatting, Clippy, and ShellCheck are architecture-independent
+# and already gated by CI on the same commit. Use `check` for the gate, or
+# `install`, which runs it.
+depends = ["toolchain"]
 run = "cargo build --release --locked"
 
 [tasks.install]
