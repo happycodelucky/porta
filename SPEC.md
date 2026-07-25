@@ -1495,11 +1495,11 @@ No `CARGO_REGISTRY_TOKEN` secret exists in the repository.
 Because a published version can never be replaced, the job first queries the
 registry and skips a version that is already there, so re-running a tag is safe.
 
-Trusted publishing cannot perform a crate's first publish: the publisher
-configuration is attached to an existing crate, so `0.9.0` must be published
-manually with `cargo publish --locked` and the publisher then configured on
-crates.io against this repository and `release.yml`. Every later version
-publishes from the workflow.
+Trusted publishing cannot perform a crate's first publish, because the publisher
+configuration attaches to an existing crate. `0.9.0` was therefore published
+manually with `cargo publish --locked`, and the publisher configured on crates.io
+against this repository and `release.yml`. Every later version publishes from the
+workflow.
 
 ## 14. Security and resilience
 

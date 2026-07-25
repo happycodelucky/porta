@@ -1,6 +1,7 @@
 # Port Authority
 
 [![CI](https://img.shields.io/github/actions/workflow/status/happycodelucky/porta/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/happycodelucky/porta/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/port-authority.svg?style=for-the-badge&logo=rust&logoColor=white&label=crates.io)](https://crates.io/crates/port-authority)
 ![Rust 1.93+](https://img.shields.io/badge/Rust-1.93%2B-CE422B.svg?style=for-the-badge&logo=rust&logoColor=white)
 ![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon-blue.svg?style=for-the-badge&logo=apple)
 ![Linux](https://img.shields.io/badge/Linux-ARM64%20%7C%20x86--64-FCC624.svg?style=for-the-badge&logo=linux&logoColor=black)
@@ -58,8 +59,7 @@ fuller comparison, including where these tools do better, is in
 ## Install
 
 > Port Authority is at **0.9** — feature complete and stabilizing ahead of 1.0.
-> Homebrew, mise, and the prebuilt binaries work today. Publishing to crates.io
-> is still pending, so the Cargo path builds from the repository for now.
+> Every channel below is live.
 
 ### Homebrew
 
@@ -78,8 +78,14 @@ needed:
 mise use -g github:happycodelucky/porta
 ```
 
-Once porta is on crates.io, `mise use -g cargo:port-authority@latest` and a
-`porta@latest` registry shorthand will work too.
+Or build it from the crate:
+
+```bash
+mise use -g cargo:port-authority@latest
+```
+
+Once the shorthand lands in the mise registry, `mise use -g porta@latest` will
+do the same thing.
 
 ### Debian and Ubuntu
 
@@ -95,15 +101,18 @@ the file directly. `sudo apt remove porta` uninstalls it.
 
 ### Cargo
 
-Not on crates.io yet, so install from the repository:
-
 ```bash
-cargo install --git https://github.com/happycodelucky/porta --locked
+cargo install port-authority --locked
 ```
 
-Once it's published, `cargo install port-authority --locked` and
-`cargo binstall port-authority` will work. The crate is named `port-authority`
-because `porta` was already taken; the binary it installs is still `porta`.
+That compiles from source. To grab the released binary instead:
+
+```bash
+cargo binstall port-authority
+```
+
+The crate is named `port-authority` because `porta` was already taken by an
+unrelated project. The binary it installs is still `porta`.
 
 ### Prebuilt binaries
 
@@ -112,7 +121,7 @@ attached to each [release](https://github.com/happycodelucky/porta/releases),
 with a `SHA256SUMS` file to verify against. Extract `porta` onto your `PATH`.
 
 Intel Macs don't get a prebuilt binary — build one with
-`cargo install --git https://github.com/happycodelucky/porta --locked`.
+`cargo install port-authority --locked`.
 
 ### Windows
 
