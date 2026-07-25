@@ -135,17 +135,25 @@ jobs:
         working-directory: artifacts
         run: cat ./*.sha256 | tee SHA256SUMS
 
-      - name: Create the GitHub release
+      - name: Create or update the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="${{ inputs.tag || github.ref_name }}"
-          gh release create "$tag" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "$tag" \
-            --generate-notes \
-            --verify-tag \
-            artifacts/*.tar.gz artifacts/*.deb artifacts/SHA256SUMS
+          assets=(artifacts/*.tar.gz artifacts/*.deb artifacts/SHA256SUMS)
+          # `gh release create` fails if the release already exists, which breaks
+          # re-running a tag. When it exists, replace its assets in place instead.
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $tag exists; replacing its assets"
+            gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber "${assets[@]}"
+          else
+            gh release create "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$tag" \
+              --generate-notes \
+              --verify-tag \
+              "${assets[@]}"
+          fi
 
   homebrew:
     name: update Homebrew tap
@@ -184,26 +192,34 @@ jobs:
           scripts/render-formula.sh "${tag#v}" "$owner" artifacts > porta.rb
           cat porta.rb
 
-      - uses: actions/checkout@v7
+      - name: Publish the formula to the tap
         if: steps.token.outputs.present == 'true'
-        with:
-          repository: ${{ env.TAP_REPOSITORY }}
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          path: tap
-
-      - name: Commit the formula
-        if: steps.token.outputs.present == 'true'
-        working-directory: tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           tag="${{ inputs.tag || github.ref_name }}"
+
+          # actions/checkout cannot be used for the tap: a freshly created tap
+          # has no commits and therefore no branch, and checkout fails on it.
+          # Init a local repo instead and adopt the remote's main only when it
+          # already exists, so an empty tap is seeded on the first release.
+          git init -b main tap
+          cd tap
+          git remote add origin "https://x-access-token:${TAP_TOKEN}@github.com/${TAP_REPOSITORY}.git"
+          if git fetch --depth=1 origin main 2>/dev/null; then
+            git reset --hard origin/main
+          else
+            echo "Tap is empty; seeding it"
+          fi
+
           mkdir -p Formula
           cp ../porta.rb Formula/porta.rb
+          git add Formula/porta.rb
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- Formula/porta.rb; then
+          if git diff --cached --quiet; then
             echo "Formula already current for $tag"
             exit 0
           fi
-          git add Formula/porta.rb
           git commit -m "porta $tag"
-          git push
+          git push origin main
