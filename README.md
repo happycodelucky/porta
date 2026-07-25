@@ -58,8 +58,8 @@ fuller comparison, including where these tools do better, is in
 ## Install
 
 > Port Authority is at **0.9** — feature complete and stabilizing ahead of 1.0.
-> The channels below activate with the first tagged release; until then, build
-> from source.
+> Homebrew, mise, and the prebuilt binaries work today. Publishing to crates.io
+> is still pending, so the Cargo path builds from the repository for now.
 
 ### Homebrew
 
@@ -71,21 +71,15 @@ brew install happycodelucky/tap/porta
 
 ### mise
 
-Fetch the prebuilt binary straight from the GitHub release — no Rust toolchain
+Install the released binary through the GitHub backend — no Rust toolchain
 needed:
 
 ```bash
 mise use -g github:happycodelucky/porta
 ```
 
-Or build it from the crate:
-
-```bash
-mise use -g cargo:port-authority@latest
-```
-
-Once the shorthand lands in the mise registry, `mise use -g porta@latest` will
-do the same thing.
+Once porta is on crates.io, `mise use -g cargo:port-authority@latest` and a
+`porta@latest` registry shorthand will work too.
 
 ### Debian and Ubuntu
 
@@ -101,18 +95,15 @@ the file directly. `sudo apt remove porta` uninstalls it.
 
 ### Cargo
 
-```bash
-cargo install port-authority --locked
-```
-
-That compiles from source. To grab the released binary instead:
+Not on crates.io yet, so install from the repository:
 
 ```bash
-cargo binstall port-authority
+cargo install --git https://github.com/happycodelucky/porta --locked
 ```
 
-The crates.io package is `port-authority` because `porta` was already taken by
-an unrelated project. The binary it installs is still `porta`.
+Once it's published, `cargo install port-authority --locked` and
+`cargo binstall port-authority` will work. The crate is named `port-authority`
+because `porta` was already taken; the binary it installs is still `porta`.
 
 ### Prebuilt binaries
 
@@ -120,8 +111,8 @@ Checksummed archives for macOS (Apple Silicon) and Linux (ARM64 and x86-64) are
 attached to each [release](https://github.com/happycodelucky/porta/releases),
 with a `SHA256SUMS` file to verify against. Extract `porta` onto your `PATH`.
 
-Intel Macs don't get a prebuilt binary. `cargo install port-authority --locked`
-builds one.
+Intel Macs don't get a prebuilt binary — build one with
+`cargo install --git https://github.com/happycodelucky/porta --locked`.
 
 ### Windows
 
