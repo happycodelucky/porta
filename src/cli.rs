@@ -207,6 +207,14 @@ impl ResponseType {
     }
 }
 
+/// The parsed command tree, for tools that render it into something other than
+/// `--help`. The man page and the shell completions are both generated from
+/// this, so they cannot drift from the arguments the binary actually accepts.
+#[must_use]
+pub fn command() -> clap::Command {
+    Cli::command()
+}
+
 #[must_use]
 pub fn main() -> ExitCode {
     let arguments: Vec<OsString> = std::env::args_os().collect();

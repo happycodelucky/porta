@@ -38,6 +38,18 @@ Port Authority coordinates local TCP ports across git worktrees, coding agents,
 sandboxes, and parallel application instances. Reservations are durable and keyed
 to a directory; leases are short-lived and renewable. State lives in a per-user
 registry guarded by a file lock, so no daemon runs."""
+# Declaring assets replaces cargo-deb's defaults, so the binary and the README
+# are repeated here rather than inherited. Everything under target/dist comes
+# from `mise run docs`; cargo-deb compresses the man pages on its own, which is
+# what lintian expects. The man glob picks up new subcommand pages by itself.
+assets = [
+    ["target/release/porta", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/porta/README", "644"],
+    ["target/dist/man/*.1", "usr/share/man/man1/", "644"],
+    ["target/dist/completions/porta.bash", "usr/share/bash-completion/completions/porta", "644"],
+    ["target/dist/completions/_porta", "usr/share/zsh/vendor-completions/_porta", "644"],
+    ["target/dist/completions/porta.fish", "usr/share/fish/vendor_completions.d/porta.fish", "644"],
+]
 
 [dependencies]
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std", "unstable-locales"] }
@@ -53,6 +65,12 @@ thiserror = "2.0.19"
 time = { version = "0.3.54", features = ["formatting", "parsing", "serde-well-known"] }
 toml = "1.1.3"
 uuid = { version = "1.24.0", features = ["serde", "v4"] }
+
+# Only the `generate-docs` example needs these, and that example never ships in
+# an installed binary, so they stay out of what downstream consumers compile.
+[dev-dependencies]
+clap_complete = "4.6.7"
+clap_mangen = "0.3.0"
 
 [profile.release]
 lto = "thin"

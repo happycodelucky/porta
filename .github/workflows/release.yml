@@ -145,12 +145,20 @@ jobs:
       - name: Build and verify
         run: mise run smoke
 
+      # Rendered from the clap command tree of the commit being released, so the
+      # pages and completions always describe the binary shipped beside them.
+      # The output is identical on every runner; regenerating per target is
+      # simpler than moving one copy between jobs, and takes a couple of seconds.
+      - name: Generate the man pages and completions
+        run: mise run docs
+
       - name: Package archive
         run: |
           version="${{ needs.prepare.outputs.version }}"
           name="porta-v${version}-${{ matrix.target }}"
           staging="$(mktemp -d)"
           cp target/release/porta LICENSE README.md "$staging/"
+          cp -R target/dist/man target/dist/completions "$staging/"
           tar czf "${name}.tar.gz" -C "$staging" .
           shasum -a 256 "${name}.tar.gz" > "${name}.tar.gz.sha256"
 

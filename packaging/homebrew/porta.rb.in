@@ -25,6 +25,12 @@ class Porta < Formula
 
   def install
     bin.install "porta"
+    # Generated from the clap command tree at release time and carried in the
+    # archive, so nothing has to run the binary to produce them.
+    man1.install Dir["man/*.1"]
+    bash_completion.install "completions/porta.bash" => "porta"
+    zsh_completion.install "completions/_porta"
+    fish_completion.install "completions/porta.fish"
   end
 
   test do

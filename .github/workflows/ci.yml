@@ -32,6 +32,11 @@ jobs:
       # isolated PORTA_HOME.
       - run: mise run smoke
 
+      # Clippy only compiles the generator. Running it here means a break
+      # surfaces on the pull request rather than partway through a release,
+      # where packaging depends on the output.
+      - run: mise run docs
+
   lint-stable:
     name: lint (stable Rust)
     runs-on: ubuntu-22.04

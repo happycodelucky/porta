@@ -33,6 +33,14 @@ class Porta < Formula
 
   def install
     system "cargo", "install", *std_cargo_args
+    # The tap formula takes these from the release archive, but a source build
+    # has to render them itself. The generator writes from the same clap command
+    # tree the binary parses with.
+    system "cargo", "run", "--example", "generate-docs", "--", "dist"
+    man1.install Dir["dist/man/*.1"]
+    bash_completion.install "dist/completions/porta.bash" => "porta"
+    zsh_completion.install "dist/completions/_porta"
+    fish_completion.install "dist/completions/porta.fish"
   end
 
   test do

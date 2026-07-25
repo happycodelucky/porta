@@ -157,6 +157,17 @@ Then confirm it landed:
 porta --version
 ```
 
+### Man pages and completions
+
+Homebrew and the Debian package install both. `man porta` covers the top level
+and every subcommand has its own page, so `man porta-lease` and
+`man porta-listeners` work too. Completions cover bash, zsh, and fish, and they
+know the value lists for flags like `--order`.
+
+Cargo can't install man pages, so `cargo install` and `cargo binstall` leave you
+with just the binary. Every release archive carries the files under `man/` and
+`completions/` if you'd rather place them yourself.
+
 ## Commands
 
 ```text
@@ -485,7 +496,7 @@ mise run smoke     # end-to-end CLI test against isolated state
 ```
 
 The task graph also has `format`, `lint-stable` (Clippy on moving stable),
-`build`, `install`, `audit`, and `package`. Tests isolate their state with
+`build`, `install`, `docs` (man pages and completions), `audit`, and `package`. Tests isolate their state with
 `PORTA_HOME` and include multi-process registry and configuration concurrency
 coverage. [`mise.lock`](mise.lock) pins resolved tools for the supported
 platforms.

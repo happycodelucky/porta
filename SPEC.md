@@ -1159,10 +1159,12 @@ depends = ["check"]
 run = "cargo build --release --locked"
 ```
 
-The task graph also exposes `format`, `lint-stable`, `install`, `smoke`,
-`audit`, and `package`. `lint-stable` checks the code with the moving stable
-Rust toolchain in addition to the pinned minimum version. `install` runs
+The task graph also exposes `format`, `lint-stable`, `install`, `smoke`, `docs`,
+`deb`, `audit`, and `package`. `lint-stable` checks the code with the moving
+stable Rust toolchain in addition to the pinned minimum version. `install` runs
 `cargo install --path . --locked --force` and respects `CARGO_INSTALL_ROOT`.
+`docs` renders the man pages and shell completions covered in section 13.7, and
+`deb` depends on it because the Debian assets install what it writes.
 Every tool invocation in development and CI runs through mise. `mise.lock` pins
 the resolved project tool artifacts across the supported platform matrix.
 
@@ -1397,7 +1399,8 @@ the smoke test verified, driven by `[package.metadata.deb]` and the `deb` mise
 task. The package is named `porta` for the command rather than `port-authority`
 for the crate, and carries no Debian revision suffix because this project is
 itself the upstream. It installs `/usr/bin/porta` plus the README and license
-under `/usr/share/doc/porta/`.
+under `/usr/share/doc/porta/`, and the man pages and shell completions described
+in section 13.7.
 
 ```console
 $ sudo apt install ./porta_0.9.0_amd64.deb
@@ -1501,6 +1504,61 @@ manually with `cargo publish --locked`, and the publisher configured on crates.i
 against this repository and `release.yml`. Every later version publishes from the
 workflow.
 
+### 13.7 Man pages and shell completions
+
+Both are generated, never written by hand. `examples/generate-docs.rs` renders
+them from the same `clap::Command` tree that produces `--help`, reached through
+`port_authority::cli::command()`, so neither can describe an argument the binary
+does not accept. The `docs` mise task runs it and writes `target/dist`.
+
+The generator is an example rather than a second binary target because
+`cargo install` installs every binary in a package, and a documentation
+generator has no business landing on a user's `PATH`. Its dependencies,
+`clap_mangen` and `clap_complete`, are therefore dev-dependencies and never
+compile for downstream consumers.
+
+`clap_mangen` emits `porta.1` plus one page per subcommand, the layout git and
+cargo use: `man porta` documents the global flags and lists the subcommands,
+while `man porta-listeners` documents that subcommand's own arguments and the
+values each accepts. Only the root command carries a version, so the generator
+copies the crate version onto every subcommand before rendering, disabling the
+version flag as it does so; without that a subcommand page footers as its own
+name, and with it naively applied the page would advertise a `--version` that
+the subcommand rejects.
+
+Completions are generated for bash, zsh, and fish. Those three have conventional
+system-wide install locations that both Homebrew and Debian already index, which
+is why the list stops there.
+
+Coverage follows what each channel can carry:
+
+| Channel | Man pages | Completions |
+| --- | --- | --- |
+| Homebrew | yes | yes |
+| Debian package | yes | yes |
+| Release archive | under `man/` | under `completions/` |
+| Cargo | no | no |
+| mise | no | no |
+
+Cargo installs binaries and nothing else, so no crate-based path can carry
+either file. That is a limitation of the installer rather than something
+packaging can work around, and the README states it plainly rather than implying
+the files are always present.
+
+Release archives carry the generated files so the tap formula installs them
+directly. Homebrew's `generate_completions_from_executable` helper is the usual
+route, but it requires the binary to expose a `completions` subcommand, and the
+command contract in section 5 deliberately has none. The homebrew-core reference
+formula builds from source and runs the generator itself.
+
+Debian installs man pages under `/usr/share/man/man1/`, where `cargo-deb`
+compresses them as lintian requires, and completions under the vendor directory
+each shell reads: `/usr/share/bash-completion/completions/porta`,
+`/usr/share/zsh/vendor-completions/_porta`, and
+`/usr/share/fish/vendor_completions.d/porta.fish`. Declaring `assets` replaces
+cargo-deb's defaults, so the binary and README are listed explicitly alongside
+them.
+
 ## 14. Security and resilience
 
 - Treat registry and configuration contents as untrusted input.
@@ -1579,3 +1637,6 @@ workflow.
 - [mise Cargo backend](https://mise.jdx.dev/dev-tools/backends/cargo.html)
 - [mise backend architecture](https://mise.jdx.dev/dev-tools/backend_architecture)
 - [Publishing on crates.io](https://doc.rust-lang.org/cargo/reference/publishing.html)
+- [`clap_mangen`](https://docs.rs/clap_mangen)
+- [`clap_complete`](https://docs.rs/clap_complete)
+- [Debian policy on manual pages](https://www.debian.org/doc/debian-policy/ch-docs.html#manual-pages)
