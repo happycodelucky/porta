@@ -1427,10 +1427,27 @@ Two GitHub Actions workflows implement this.
 runs `mise run check` and `mise run smoke` on Linux and macOS, plus
 `mise run lint-stable` and `mise run audit`.
 
-`.github/workflows/release.yml` runs when a `v*` tag is pushed, and can be
-dispatched manually against an existing tag:
+`.github/workflows/release.yml` runs when a `v*` tag is pushed, and can also be
+dispatched manually:
 
-1. A build matrix compiles each supported target natively on its own runner,
+1. A `prepare` job resolves the tag every later job checks out. For a tag push
+   the tag is already the trigger. A manual dispatch takes the tag as input plus
+   a `create_tag` checkbox, unchecked by default, which decides whether the run
+   may create it:
+
+   | `create_tag` | Tag exists | Result |
+   | --- | --- | --- |
+   | unchecked | yes | releases the existing tag |
+   | unchecked | no | fails, so a typo cannot silently create a release |
+   | checked | no | creates and pushes the tag, then releases it |
+   | checked | yes | fails rather than moving a tag whose artifacts are published |
+
+   Creating a tag additionally requires the branch's `Cargo.toml` version to
+   match, so a tag never names a commit that disagrees with it. The tag is
+   pushed with `GITHUB_TOKEN`, which by design does not trigger workflows, so
+   the run cannot start a second release of itself.
+
+2. A build matrix compiles each supported target natively on its own runner,
    so no cross-compilation is involved and every binary is exercised by
    `mise run smoke` on the platform it ships to. Linux targets build on
    Ubuntu 22.04 to keep the glibc floor low enough for older distributions.
@@ -1452,23 +1469,37 @@ dispatched manually against an existing tag:
    gates them on the same commit, so `build` is deliberately independent of
    `check` in the task graph.
 
-2. Each job packages `porta-v<version>-<target>.tar.gz` containing the binary,
+3. Each job packages `porta-v<version>-<target>.tar.gz` containing the binary,
    license, and README at the archive root, alongside its SHA-256.
-3. The release job verifies the tag matches the `Cargo.toml` version, then
-   publishes the archives and a combined `SHA256SUMS` to a GitHub release.
-4. The Homebrew job renders `packaging/homebrew/porta.rb.in` through
+4. The release job verifies the tag matches the `Cargo.toml` version, then
+   publishes the archives and a combined `SHA256SUMS` to a GitHub release. It
+   replaces the assets of an existing release rather than failing, so a tag can
+   be re-run.
+5. The Homebrew job renders `packaging/homebrew/porta.rb.in` through
    `scripts/render-formula.sh`, recomputing each checksum from the archives
    themselves, and commits the result to the tap repository.
+6. The crates job publishes to crates.io. It runs after the GitHub release, so a
+   failure there cannot leave an immutable crates.io version pointing at a
+   release that does not exist.
 
 Because the built-in `GITHUB_TOKEN` cannot write to another repository, the tap
 update requires a `HOMEBREW_TAP_TOKEN` secret holding a scoped personal access
 token with contents write permission on the tap. When that secret is absent the
 release still completes and only the tap update is skipped with a warning.
 
-Publishing to crates.io stays a deliberate manual step, because publishing a
-version is irreversible. It runs from a verified checkout after the tagged
-release exists. Publishing credentials must use scoped tokens or trusted
-publishing and must never be stored in the repository.
+crates.io publishing uses trusted publishing rather than a stored token. The
+job requests a GitHub OIDC token, `rust-lang/crates-io-auth-action` exchanges it
+for a short-lived registry token, and that token is revoked when the job ends.
+No `CARGO_REGISTRY_TOKEN` secret exists in the repository.
+
+Because a published version can never be replaced, the job first queries the
+registry and skips a version that is already there, so re-running a tag is safe.
+
+Trusted publishing cannot perform a crate's first publish: the publisher
+configuration is attached to an existing crate, so `0.9.0` must be published
+manually with `cargo publish --locked` and the publisher then configured on
+crates.io against this repository and `release.yml`. Every later version
+publishes from the workflow.
 
 ## 14. Security and resilience
 
