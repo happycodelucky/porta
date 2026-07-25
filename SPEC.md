@@ -1,6 +1,6 @@
 # Port Authority (`porta`) Specification
 
-- Status: Release candidate (`0.9.0`)
+- Status: Release candidate (`0.9.1`)
 - Implementation: Rust 1.93
 - Product name: Port Authority
 - Executable name: `porta`
@@ -1160,11 +1160,13 @@ run = "cargo build --release --locked"
 ```
 
 The task graph also exposes `format`, `lint-stable`, `install`, `smoke`, `docs`,
-`deb`, `audit`, and `package`. `lint-stable` checks the code with the moving
-stable Rust toolchain in addition to the pinned minimum version. `install` runs
-`cargo install --path . --locked --force` and respects `CARGO_INSTALL_ROOT`.
-`docs` renders the man pages and shell completions covered in section 13.7, and
-`deb` depends on it because the Debian assets install what it writes.
+`deb`, `version`, `audit`, and `package`. `lint-stable` checks the code with the
+moving stable Rust toolchain in addition to the pinned minimum version.
+`install` runs `cargo install --path . --locked --force` and respects
+`CARGO_INSTALL_ROOT`. `docs` renders the man pages and shell completions covered
+in section 13.7, and `deb` depends on it because the Debian assets install what
+it writes. `version` sets the release version everywhere it is recorded, which
+section 13.8 describes.
 Every tool invocation in development and CI runs through mise. `mise.lock` pins
 the resolved project tool artifacts across the supported platform matrix.
 
@@ -1403,7 +1405,7 @@ under `/usr/share/doc/porta/`, and the man pages and shell completions described
 in section 13.7.
 
 ```console
-$ sudo apt install ./porta_0.9.0_amd64.deb
+$ sudo apt install ./porta_0.9.1_amd64.deb
 ```
 
 Dependencies resolve through `dpkg-shlibdeps`, which `cargo-deb` only warns
@@ -1445,10 +1447,16 @@ dispatched manually:
    | checked | no | creates and pushes the tag, then releases it |
    | checked | yes | fails rather than moving a tag whose artifacts are published |
 
-   Creating a tag additionally requires the branch's `Cargo.toml` version to
-   match, so a tag never names a commit that disagrees with it. The tag is
-   pushed with `GITHUB_TOKEN`, which by design does not trigger workflows, so
-   the run cannot start a second release of itself.
+   Every path through this job then confirms that the tree the tag names
+   carries a matching `Cargo.toml` version, so a tag can never describe a commit
+   that disagrees with it. It reads that version through git rather than from
+   the working tree, because a dispatch checks out the branch while the tag may
+   name something else. This check once ran only while creating a tag, which let
+   a hand-pushed tag skip it, reach the release job, and fail there after every
+   build had already run; the release job still repeats it as the last gate
+   before anything is published. A tag the run creates is pushed with
+   `GITHUB_TOKEN`, which by design does not trigger workflows, so the run cannot
+   start a second release of itself.
 
 2. A build matrix compiles each supported target natively on its own runner,
    so no cross-compilation is involved and every binary is exercised by
@@ -1473,7 +1481,8 @@ dispatched manually:
    `check` in the task graph.
 
 3. Each job packages `porta-v<version>-<target>.tar.gz` containing the binary,
-   license, and README at the archive root, alongside its SHA-256.
+   license, and README at the archive root, plus the generated `man/` and
+   `completions/` directories, alongside its SHA-256.
 4. The release job verifies the tag matches the `Cargo.toml` version, then
    publishes the archives and a combined `SHA256SUMS` to a GitHub release. It
    replaces the assets of an existing release rather than failing, so a tag can
@@ -1558,6 +1567,55 @@ each shell reads: `/usr/share/bash-completion/completions/porta`,
 `/usr/share/fish/vendor_completions.d/porta.fish`. Declaring `assets` replaces
 cargo-deb's defaults, so the binary and README are listed explicitly alongside
 them.
+
+### 13.8 Cutting a release
+
+The version is written down in seven places: the manifest, the lock file, a test
+asserting what `porta --version` prints, the `.deb` filename in two install
+walkthroughs, this document's header, and the source tarball URL in the
+homebrew-core reference formula. Bumping the manifest alone leaves the test
+suite failing, and bumping all seven by hand is how a tag comes to disagree with
+the tree it names.
+
+`mise run version <x.y.z>` sets them together:
+
+```console
+$ mise run version 0.9.1
+Setting version 0.9.0 -> 0.9.1
+  Cargo.toml
+  tests/cli.rs
+  README.md
+  SPEC.md
+  packaging/homebrew/porta-core.rb
+  Cargo.lock
+```
+
+Each edit is anchored to the text surrounding the version rather than to the
+version being replaced, so the previous value never has to be supplied and a
+second run changes nothing. An anchor that stops matching fails the run instead
+of quietly skipping its file, because a skipped edit is exactly what produces a
+mismatched tag. Edits are staged and copied into the working tree only once all
+of them have succeeded, so a failure part way through cannot leave a bumped
+manifest beside an unbumped test.
+
+The list is curated rather than a search and replace because not every mention
+of a version is a version reference. This document records the measured size of
+one particular release binary, and records which version was first published to
+crates.io by hand; both stay true only if left alone. The task prints whatever
+still mentions the previous version, so telling history from oversight stays a
+judgement rather than an assumption.
+
+The procedure is then:
+
+1. `mise run version <x.y.z>` on `main`, and review the diff.
+2. `mise run check` and `mise run smoke`.
+3. Commit and push, so CI gates the commit the tag will name.
+4. Tag it, either by pushing `v<x.y.z>` or by dispatching the release workflow
+   with `create_tag` checked, which tags the branch itself.
+
+An existing tag is assumed to name a tree whose documentation is already
+correct. The `prepare` check in section 13.6 verifies that assumption rather
+than trusting it.
 
 ## 14. Security and resilience
 

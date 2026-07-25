@@ -90,6 +90,15 @@ description = "Package the release binary as a Debian package"
 depends = ["build", "docs"]
 run = "cargo deb --no-build"
 
+[tasks.version]
+description = "Set the release version across the manifest, tests, and docs"
+# The version is written down in seven places, one of which is a test assertion,
+# so bumping the manifest alone breaks the suite. Releases validate the tag
+# against the manifest, and a hand-edited bump that misses a file is what makes
+# that check fail. Run this, review the diff, then commit and tag.
+depends = ["toolchain"]
+run = "bash scripts/set-version.sh {{arg(name=\"version\")}}"
+
 [tasks.audit]
 description = "Audit Rust dependencies for known vulnerabilities"
 run = "cargo audit"

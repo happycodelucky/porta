@@ -92,7 +92,7 @@ do the same thing.
 Every release ships `.deb` packages for amd64 and arm64:
 
 ```bash
-sudo apt install ./porta_0.9.0_amd64.deb
+sudo apt install ./porta_0.9.1_amd64.deb
 ```
 
 There's no APT repository to add — download the `.deb` from the
@@ -496,10 +496,14 @@ mise run smoke     # end-to-end CLI test against isolated state
 ```
 
 The task graph also has `format`, `lint-stable` (Clippy on moving stable),
-`build`, `install`, `docs` (man pages and completions), `audit`, and `package`. Tests isolate their state with
-`PORTA_HOME` and include multi-process registry and configuration concurrency
-coverage. [`mise.lock`](mise.lock) pins resolved tools for the supported
-platforms.
+`build`, `install`, `docs` (man pages and completions), `version`, `audit`, and
+`package`. Tests isolate their state with `PORTA_HOME` and include multi-process
+registry and configuration concurrency coverage. [`mise.lock`](mise.lock) pins
+resolved tools for the supported platforms.
+
+Releases start with `mise run version 1.2.3`. The version lives in seven places
+— including a test that asserts what `porta --version` prints — so bumping the
+manifest by hand leaves the suite red. Then commit, push, and tag.
 
 The full CLI, JSON, registry, and packaging contract lives in
 [SPEC.md](SPEC.md), not in this README.

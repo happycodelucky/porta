@@ -76,20 +76,41 @@ jobs:
             exists=true
           fi
 
-          if [ "$create" = "true" ]; then
+          if [ "$create" = "true" ] && [ "$exists" = "true" ]; then
             # Refuse to move an existing tag. Released artifacts are checksummed
             # against it, so repointing one would invalidate what is published.
-            if [ "$exists" = "true" ]; then
-              echo "::error::tag $tag already exists; re-run with create_tag unchecked to release it"
-              exit 1
+            echo "::error::tag $tag already exists; re-run with create_tag unchecked to release it"
+            exit 1
+          fi
+          if [ "$create" != "true" ] && [ "$exists" = "false" ]; then
+            echo "::error::tag $tag does not exist; re-run with create_tag checked to create it"
+            exit 1
+          fi
+
+          # A tag must never name a tree whose manifest disagrees with it. This
+          # once ran only while creating a tag, so a hand-pushed tag skipped it
+          # and failed in the release job instead, after every build had already
+          # run. Checking here costs seconds and fails before anything builds.
+          #
+          # The tree to check is whichever one the tag names: the branch about
+          # to be tagged when creating, the tag itself otherwise. A dispatch
+          # checks out the branch rather than the tag, so read it through git
+          # rather than from the working tree.
+          if [ "$create" = "true" ]; then
+            source_ref=HEAD
+          else
+            if ! git rev-parse --verify --quiet "refs/tags/${tag}" >/dev/null; then
+              git fetch --no-tags origin "refs/tags/${tag}:refs/tags/${tag}"
             fi
-            # The tag must describe the commit it names, so check the manifest
-            # before creating anything.
-            manifest="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
-            if [ "$version" != "$manifest" ]; then
-              echo "::error::tag $tag does not match Cargo.toml version $manifest"
-              exit 1
-            fi
+            source_ref="refs/tags/${tag}"
+          fi
+          manifest="$(git show "${source_ref}:Cargo.toml" | sed -n 's/^version = "\(.*\)"/\1/p' | head -1)"
+          if [ "$version" != "$manifest" ]; then
+            echo "::error::tag $tag names a tree whose Cargo.toml says $manifest; run 'mise run version $version' on that commit and tag the result"
+            exit 1
+          fi
+
+          if [ "$create" = "true" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git tag -a "$tag" -m "Port Authority $version"
@@ -97,9 +118,6 @@ jobs:
             # cannot start a second Release run.
             git push origin "$tag"
             echo "::notice::created tag $tag at $(git rev-parse --short HEAD)"
-          elif [ "$exists" = "false" ]; then
-            echo "::error::tag $tag does not exist; re-run with create_tag checked to create it"
-            exit 1
           fi
 
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
@@ -207,6 +225,10 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      # The prepare job already checked this and fails the run in seconds. This
+      # repeat is the last gate before anything irreversible is published, and
+      # it checks the tag's own checked-out tree rather than reading it through
+      # git, so it cannot be fooled by a bad ref resolution upstream.
       - name: Confirm the tag matches Cargo.toml
         run: |
           version="${{ needs.prepare.outputs.version }}"
