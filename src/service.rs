@@ -220,7 +220,7 @@ impl PortaService {
         Ok(lease_result(&lease))
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     pub fn reserve(&self, request: &ReserveRequest) -> Result<ReserveResult> {
         validate_keys(&request.keys)?;
         let directory = resolve_directory(&request.directory, true)?;
@@ -532,7 +532,7 @@ impl PortaService {
         let now = OffsetDateTime::now_utc();
         let mut transaction = self.registry.begin(config.cleanup_trigger_start)?;
         sweep_expired(&mut transaction, now)?;
-        observe_directories(transaction.registry_mut(), now);
+        observe_directories(&mut transaction, now);
         let mut reservations = transaction.registry().reservations.clone();
         reservations.sort_by(|left, right| left.directory.cmp(&right.directory));
         let views: Vec<ReservationView> = reservations
@@ -662,31 +662,43 @@ struct ExpirationStats {
     expired_reservations: usize,
 }
 
+/// Inspects through a shared borrow first and takes `registry_mut` only when
+/// something is actually removed, so read-only commands leave the registry
+/// file untouched.
 fn sweep_expired(
     transaction: &mut RegistryTransaction,
     now: OffsetDateTime,
 ) -> Result<ExpirationStats> {
-    let registry = transaction.registry_mut();
-    let leases = std::mem::take(&mut registry.open_leases);
-    let mut retained = Vec::with_capacity(leases.len());
-    let mut released_leases = 0;
-    for lease in leases {
-        if lease.expires_at > now || port_is_bound(lease.port)? {
-            retained.push(lease);
-        } else {
-            released_leases += 1;
+    let registry = transaction.registry();
+    let mut released = HashSet::new();
+    for lease in &registry.open_leases {
+        if lease.expires_at <= now && !port_is_bound(lease.port)? {
+            released.insert(lease.id);
         }
     }
-    registry.open_leases = retained;
-    let before = registry.reservations.len();
-    registry.reservations.retain(|reservation| {
-        reservation
-            .expires_at
-            .is_none_or(|expires_at| expires_at > now)
-    });
+    let expired_reservations = registry
+        .reservations
+        .iter()
+        .filter(|reservation| {
+            reservation
+                .expires_at
+                .is_some_and(|expires_at| expires_at <= now)
+        })
+        .count();
+    if !released.is_empty() || expired_reservations > 0 {
+        let registry = transaction.registry_mut();
+        registry
+            .open_leases
+            .retain(|lease| !released.contains(&lease.id));
+        registry.reservations.retain(|reservation| {
+            reservation
+                .expires_at
+                .is_none_or(|expires_at| expires_at > now)
+        });
+    }
     Ok(ExpirationStats {
-        released_leases,
-        expired_reservations: before - registry.reservations.len(),
+        released_leases: released.len(),
+        expired_reservations,
     })
 }
 
@@ -735,14 +747,25 @@ fn observe_missing(
 /// Records the directory state `list` has to stat anyway: a newly absent
 /// directory is marked so its grace period starts, and a directory that came
 /// back is unmarked. Reaping stays in `clean`, so listing never removes a
-/// reservation.
-fn observe_directories(registry: &mut Registry, now: OffsetDateTime) {
-    for reservation in &mut registry.reservations {
-        if reservation.directory.is_dir() {
-            reservation.missing_since = None;
-        } else if reservation.missing_since.is_none() {
-            reservation.missing_since = Some(now);
-        }
+/// reservation. Only a reservation whose state flipped takes `registry_mut`,
+/// so a steady-state listing does not rewrite the registry.
+fn observe_directories(transaction: &mut RegistryTransaction, now: OffsetDateTime) {
+    let flipped: Vec<usize> = transaction
+        .registry()
+        .reservations
+        .iter()
+        .enumerate()
+        .filter(|(_, reservation)| {
+            reservation.directory.is_dir() == reservation.missing_since.is_some()
+        })
+        .map(|(index, _)| index)
+        .collect();
+    for index in flipped {
+        let reservation = &mut transaction.registry_mut().reservations[index];
+        reservation.missing_since = match reservation.missing_since {
+            Some(_) => None,
+            None => Some(now),
+        };
     }
 }
 

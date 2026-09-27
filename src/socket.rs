@@ -69,30 +69,31 @@ fn select_contiguous<S: BuildHasher>(
     registered: &HashSet<u16, S>,
 ) -> Result<ProbeSelection> {
     let last_start = usize::from(u16::MAX) + 1 - count;
-    for start in usize::from(base)..=last_start {
+    let mut next_start = usize::from(base);
+    'windows: while next_start <= last_start {
+        let start = next_start;
         let mut ports = Vec::with_capacity(count);
         let mut sockets = Vec::new();
-        let mut complete = true;
         for value in start..start + count {
             let port = u16::try_from(value).map_err(|_| no_available(base, count))?;
-            if registered.contains(&port) {
-                complete = false;
-                break;
-            }
-            if let Some(mut bound) = probe_port(port)? {
-                ports.push(port);
-                sockets.append(&mut bound);
+            let probed = if registered.contains(&port) {
+                None
             } else {
-                complete = false;
-                break;
-            }
+                probe_port(port)?
+            };
+            let Some(mut bound) = probed else {
+                // Every window that still covers this port would fail on it
+                // too, so the next candidate starts just past it.
+                next_start = value + 1;
+                continue 'windows;
+            };
+            ports.push(port);
+            sockets.append(&mut bound);
         }
-        if complete {
-            return Ok(ProbeSelection {
-                ports,
-                _sockets: sockets,
-            });
-        }
+        return Ok(ProbeSelection {
+            ports,
+            _sockets: sockets,
+        });
     }
     Err(no_available(base, count))
 }
@@ -161,7 +162,20 @@ fn unsupported(error: &io::Error) -> bool {
     matches!(
         error.kind(),
         io::ErrorKind::Unsupported | io::ErrorKind::AddrNotAvailable
-    )
+    ) || address_family_unsupported(error)
+}
+
+/// A kernel without IPv6 rejects the socket itself with `EAFNOSUPPORT`, which
+/// the standard library leaves uncategorized rather than mapping to
+/// `Unsupported`.
+#[cfg(unix)]
+fn address_family_unsupported(error: &io::Error) -> bool {
+    error.raw_os_error() == Some(libc::EAFNOSUPPORT)
+}
+
+#[cfg(not(unix))]
+fn address_family_unsupported(_error: &io::Error) -> bool {
+    false
 }
 
 fn socket_error(error: &io::Error) -> PortaError {

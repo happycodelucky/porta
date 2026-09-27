@@ -1,4 +1,5 @@
 use std::ffi::OsString;
+use std::fmt;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -16,6 +17,15 @@ use crate::duration::format_timestamp;
 use crate::error::{PortaError, Result};
 use crate::listeners::{ListenerEntry, ListenerOrder, ListenersResult};
 use crate::service::{CleanResult, ListResult, PortInfo, PortaService, ReserveRequest};
+
+/// Writes a line to stdout like `println!`, which instead panics once the
+/// reader has gone away (`porta listeners | head -1`). A closed pipe ends
+/// output quietly; any other write failure becomes an `output_failed` error.
+macro_rules! outln {
+    ($($argument:tt)*) => {
+        write_line(format_args!($($argument)*))
+    };
+}
 
 #[derive(Debug, Parser)]
 #[command(
@@ -242,7 +252,7 @@ pub fn main() -> ExitCode {
     let Some(command) = cli.command else {
         let mut command = Cli::command();
         let _ = command.print_help();
-        println!();
+        let _ = outln!("");
         return ExitCode::SUCCESS;
     };
 
@@ -283,12 +293,11 @@ fn execute_listeners(arguments: ListenersArgs, json_output: bool) -> Result<()> 
     if json_output {
         emit_success(ResponseType::Listeners, &result)
     } else {
-        print_listeners(&result);
-        Ok(())
+        print_listeners(&result)
     }
 }
 
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 fn execute(service: &PortaService, command: Command, json_output: bool) -> Result<()> {
     match command {
         Command::Lease(arguments) => {
@@ -300,7 +309,7 @@ fn execute(service: &PortaService, command: Command, json_output: bool) -> Resul
             if json_output {
                 emit_success(ResponseType::Lease, &result)?;
             } else {
-                println!("{}", result.port);
+                outln!("{}", result.port)?;
             }
         }
         Command::Reserve(arguments) => {
@@ -314,7 +323,7 @@ fn execute(service: &PortaService, command: Command, json_output: bool) -> Resul
             if json_output {
                 emit_success(ResponseType::Reserve, &result)?;
             } else if result.allocations.iter().any(|item| item.key.is_some()) {
-                println!(
+                outln!(
                     "{}",
                     result
                         .allocations
@@ -322,9 +331,9 @@ fn execute(service: &PortaService, command: Command, json_output: bool) -> Resul
                         .map(|item| format!("{}={}", item.key.as_deref().unwrap_or("-"), item.port))
                         .collect::<Vec<_>>()
                         .join(" ")
-                );
+                )?;
             } else {
-                println!(
+                outln!(
                     "{}",
                     result
                         .ports
@@ -332,7 +341,7 @@ fn execute(service: &PortaService, command: Command, json_output: bool) -> Resul
                         .map(u16::to_string)
                         .collect::<Vec<_>>()
                         .join(" ")
-                );
+                )?;
             }
         }
         Command::Release(arguments) => {
@@ -342,7 +351,7 @@ fn execute(service: &PortaService, command: Command, json_output: bool) -> Resul
                 if json_output {
                     emit_success(ResponseType::Release, &result)?;
                 } else {
-                    print_released(&result.ports);
+                    print_released(&result.ports)?;
                 }
             } else {
                 let ports = arguments
@@ -354,7 +363,7 @@ fn execute(service: &PortaService, command: Command, json_output: bool) -> Resul
                 if json_output {
                     emit_success(ResponseType::Release, &result)?;
                 } else {
-                    print_released(&result.ports);
+                    print_released(&result.ports)?;
                 }
             }
         }
@@ -363,7 +372,7 @@ fn execute(service: &PortaService, command: Command, json_output: bool) -> Resul
             if json_output {
                 emit_success(ResponseType::Get, &result)?;
             } else {
-                println!("{}", result.port);
+                outln!("{}", result.port)?;
             }
         }
         Command::Info(arguments) => {
@@ -377,7 +386,7 @@ fn execute(service: &PortaService, command: Command, json_output: bool) -> Resul
                 emit_success(ResponseType::Info, &json!({ "ports": ports }))?;
             } else {
                 for port in ports {
-                    println!("{}", format_port_info(&port)?);
+                    outln!("{}", format_port_info(&port)?)?;
                 }
             }
         }
@@ -387,9 +396,9 @@ fn execute(service: &PortaService, command: Command, json_output: bool) -> Resul
             if json_output {
                 emit_success(ResponseType::List, &result)?;
             } else if result.reservations.is_empty() && result.leases.is_empty() {
-                println!("No reservations or leases.");
+                outln!("No reservations or leases.")?;
             } else {
-                println!("{}", format_list(&result)?);
+                outln!("{}", format_list(&result)?)?;
             }
         }
         Command::Clean(arguments) => {
@@ -397,7 +406,7 @@ fn execute(service: &PortaService, command: Command, json_output: bool) -> Resul
             if json_output {
                 emit_success(ResponseType::Clean, &result)?;
             } else {
-                println!("{}", format_clean(&result));
+                outln!("{}", format_clean(&result))?;
             }
         }
         Command::Config(arguments) => match arguments.action {
@@ -406,7 +415,7 @@ fn execute(service: &PortaService, command: Command, json_output: bool) -> Resul
                 if json_output {
                     emit_success(ResponseType::Config, &json!({ "settings": settings }))?;
                 } else {
-                    println!("{}", format_config_table(&settings));
+                    outln!("{}", format_config_table(&settings))?;
                 }
             }
             Some(ConfigAction::Get { key }) => {
@@ -417,7 +426,7 @@ fn execute(service: &PortaService, command: Command, json_output: bool) -> Resul
                         &json!({ "key": key, "value": value.json() }),
                     )?;
                 } else {
-                    println!("{}", value.plain());
+                    outln!("{}", value.plain())?;
                 }
             }
             Some(ConfigAction::Set { key, value }) => {
@@ -428,7 +437,7 @@ fn execute(service: &PortaService, command: Command, json_output: bool) -> Resul
                         &json!({ "key": key, "value": value.json() }),
                     )?;
                 } else {
-                    println!("{}={}", key, value.plain());
+                    outln!("{}={}", key, value.plain())?;
                 }
             }
         },
@@ -488,34 +497,35 @@ fn format_port_info(info: &PortInfo) -> Result<String> {
     ))
 }
 
-fn print_released(ports: &[u16]) {
-    println!(
+fn print_released(ports: &[u16]) -> Result<()> {
+    outln!(
         "Released {}",
         ports
             .iter()
             .map(u16::to_string)
             .collect::<Vec<_>>()
             .join(" ")
-    );
+    )
 }
 
-fn print_listeners(result: &ListenersResult) {
+fn print_listeners(result: &ListenersResult) -> Result<()> {
     if result.listeners.is_empty() {
         if result.missing_ports.is_empty() {
-            println!("No TCP listeners found.");
+            outln!("No TCP listeners found.")?;
         } else {
-            println!(
+            outln!(
                 "No TCP listeners found for: {}",
                 format_ports(&result.missing_ports)
-            );
+            )?;
         }
-        return;
+        return Ok(());
     }
 
-    println!("{}", format_listeners_table(&result.listeners));
+    outln!("{}", format_listeners_table(&result.listeners))?;
     if !result.missing_ports.is_empty() {
-        println!("Not listening: {}", format_ports(&result.missing_ports));
+        outln!("Not listening: {}", format_ports(&result.missing_ports))?;
     }
+    Ok(())
 }
 
 fn format_listeners_table(entries: &[ListenerEntry]) -> String {
@@ -687,9 +697,18 @@ fn valid_port(value: u32) -> Result<u16> {
     Ok(port)
 }
 
+fn write_line(line: fmt::Arguments<'_>) -> Result<()> {
+    match writeln!(io::stdout().lock(), "{line}") {
+        Err(error) if error.kind() != io::ErrorKind::BrokenPipe => Err(PortaError::infrastructure(
+            "output_failed",
+            error.to_string(),
+        )),
+        _ => Ok(()),
+    }
+}
+
 fn emit_success<T: Serialize>(response_type: ResponseType, payload: &T) -> Result<()> {
-    println!("{}", envelope_value(response_type, payload)?);
-    Ok(())
+    outln!("{}", envelope_value(response_type, payload)?)
 }
 
 fn envelope_value<T: Serialize>(response_type: ResponseType, payload: &T) -> Result<Value> {
@@ -713,7 +732,7 @@ fn envelope_value<T: Serialize>(response_type: ResponseType, payload: &T) -> Res
 
 fn emit_error(error: &PortaError, json_output: bool) {
     if json_output {
-        println!(
+        let _ = outln!(
             "{}",
             json!({
                 "version": RESPONSE_VERSION,

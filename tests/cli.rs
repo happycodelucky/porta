@@ -593,6 +593,44 @@ fn list_marks_missing_directories_and_restores_returning_ones() {
 }
 
 #[test]
+fn read_only_commands_leave_the_registry_file_untouched() {
+    let (_temporary, state, workspace) = fixture();
+    let reserve = json_output(porta(&state).args(["reserve", "--json"]).arg(&workspace));
+    let port = reserve["ports"][0]
+        .as_u64()
+        .expect("reserved port")
+        .to_string();
+
+    // porta always writes pretty JSON, so any rewrite changes these bytes.
+    let registry = state.join("registry.json");
+    let value: Value =
+        serde_json::from_slice(&fs::read(&registry).expect("registry")).expect("registry JSON");
+    let compact = serde_json::to_vec(&value).expect("compact registry");
+    fs::write(&registry, &compact).expect("compact registry");
+
+    run(porta(&state).arg("get").arg(&workspace));
+    run(porta(&state).args(["info", &port]));
+    run(porta(&state).arg("list"));
+    assert_eq!(fs::read(&registry).expect("registry"), compact);
+}
+
+#[test]
+fn a_closed_stdout_ends_output_without_panicking() {
+    let (_temporary, state, _workspace) = fixture();
+    let mut child = porta(&state)
+        .arg("config")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn porta");
+    drop(child.stdout.take());
+    let output = child.wait_with_output().expect("wait for porta");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "stderr: {stderr}");
+    assert!(!stderr.contains("panicked"), "stderr: {stderr}");
+}
+
+#[test]
 fn bare_config_lists_effective_defaults_and_explicit_settings() {
     let temporary = tempfile::tempdir().expect("temporary directory");
     let state = temporary.path().join("state");
